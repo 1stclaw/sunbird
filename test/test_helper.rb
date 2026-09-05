@@ -9,8 +9,8 @@ $LOAD_PATH.unshift(
 require "sunbird"
 
 module SunbirdTestPaths
-  ENTITY_PATH = File.expand_path(
-    "../content/entities/actors.rb",
+  PROTOTYPE_PATH = File.expand_path(
+    "../content/prototypes/actors.rb",
     __dir__
   )
 
@@ -26,61 +26,56 @@ module SunbirdTestPaths
 end
 
 module SunbirdTestSupport
-  def actor_catalog(goblin_behavior: :chase)
-    player = Sunbird::Entity.new(
+  def prototype_catalog(goblin_behavior: :chase)
+    player = Sunbird::Prototype.new(
       name: :player,
       components: {
-        collision: Sunbird::AreaState::Collision.new(
+        collision: Sunbird::Component::Collision.new(
           blocks_movement: true
-        ),
-        facing: Sunbird::AreaState::Facing.new(
-          direction: :south
         )
       }.freeze
     )
 
-    goblin = Sunbird::Entity.new(
+    goblin = Sunbird::Prototype.new(
       name: :goblin,
       components: {
-        health: Sunbird::AreaState::Health.new(
+        health: Sunbird::Component::Health.new(
           current: 4,
           max: 4
         ),
-        behavior: Sunbird::AreaState::Behavior.new(
+        behavior: Sunbird::Component::Behavior.new(
           kind: goblin_behavior
         ),
-        collision: Sunbird::AreaState::Collision.new(
+        collision: Sunbird::Component::Collision.new(
           blocks_movement: true
         ),
-        combatant: Sunbird::AreaState::Combatant.new(
+        combatant: Sunbird::Component::Combatant.new(
           attack: 1
         )
       }.freeze
     )
 
-    villager = Sunbird::Entity.new(
+    villager = Sunbird::Prototype.new(
       name: :villager,
       components: {
-        collision: Sunbird::AreaState::Collision.new(
+        collision: Sunbird::Component::Collision.new(
           blocks_movement: true
         ),
-        interactable: Sunbird::AreaState::Interactable.new(
+        interactable: Sunbird::Component::Interactable.new(
           dialogue_key: :village_greeting
         )
       }.freeze
     )
 
-    Sunbird::Entity::Catalog.new([player, goblin, villager])
+    Sunbird::Prototype::Catalog.new([player, goblin, villager])
   end
 
   def dialogue_catalog
     Sunbird::Dialogue::Catalog.new(
-      {
-        village_greeting: [
-          "First line.",
-          "Second line."
-        ]
-      }
+      village_greeting: [
+        "First line.",
+        "Second line."
+      ]
     )
   end
 
@@ -90,28 +85,20 @@ module SunbirdTestSupport
         members: [:hero, :mage],
         leader: :hero
       ),
-      actors: {
-        hero: Sunbird::ActorState.new(
-          vitals: Sunbird::ActorState::Vitals.new(
-            hp: 10,
-            max_hp: 10,
-            mp: 4,
-            max_mp: 4
-          ),
-          stats: Sunbird::ActorState::Stats.new(
-            attack: 2
-          )
+      characters: {
+        hero: Sunbird::Character.new(
+          hp: 10,
+          max_hp: 10,
+          mp: 4,
+          max_mp: 4,
+          attack: 2
         ),
-        mage: Sunbird::ActorState.new(
-          vitals: Sunbird::ActorState::Vitals.new(
-            hp: 8,
-            max_hp: 8,
-            mp: 8,
-            max_mp: 8
-          ),
-          stats: Sunbird::ActorState::Stats.new(
-            attack: 1
-          )
+        mage: Sunbird::Character.new(
+          hp: 8,
+          max_hp: 8,
+          mp: 8,
+          max_mp: 8,
+          attack: 1
         )
       }
     )
@@ -122,7 +109,8 @@ module SunbirdTestSupport
     height: 7,
     spawns:,
     relations: [],
-    entry_spawn:
+    entries: [],
+    default_entry: nil
   )
     Sunbird::Level.new(
       name: :test,
@@ -131,8 +119,18 @@ module SunbirdTestSupport
         height: height
       ),
       spawns: spawns,
+      entries: entries,
       relations: relations,
-      entry_spawn: entry_spawn
+      default_entry: default_entry
+    )
+  end
+
+  def default_entry(x: 2, y: 2, key: :start, facing: :south)
+    Sunbird::Level::Entry.new(
+      key: key,
+      x: x,
+      y: y,
+      facing: facing
     )
   end
 
@@ -151,32 +149,42 @@ module SunbirdTestSupport
     action_input(kind)
   end
 
+  def spawn_character(
+    simulation,
+    session,
+    character_key: session.party.leader,
+    prototype: :player,
+    entry: simulation.level.default_entry
+  )
+    simulation.spawn_character(
+      character_key: character_key,
+      prototype: prototype,
+      entry: entry
+    )
+  end
+
   def advance_simulation(
     simulation,
     input,
-    controlled_id: default_controlled_id(simulation)
+    controlled_id:,
+    planner: Sunbird::TurnPlanner.new
   )
-    commands = simulation.plan(
+    commands = planner.build(
       input: input,
+      level: simulation.level,
+      world: simulation.world_view,
       controlled_id: controlled_id
     )
     simulation.step(commands: commands)
   end
 
-  def default_controlled_id(simulation)
-    entry_spawn = simulation.level.entry_spawn
-    return unless entry_spawn
-
-    simulation.instance_id_for_spawn(entry_spawn)
-  end
-
-  def instance_id_for(simulation, entity_name)
-    simulation.area_view.instance_ids.find do |instance_id|
-      ref = simulation.area_view.component(
-        instance_id,
-        :entity_ref
+  def entity_id_for(simulation, prototype_name)
+    simulation.world_view.entity_ids.find do |entity_id|
+      ref = simulation.world_view.component(
+        entity_id,
+        :prototype_ref
       )
-      ref&.name == entity_name
+      ref&.name == prototype_name
     end
   end
 end

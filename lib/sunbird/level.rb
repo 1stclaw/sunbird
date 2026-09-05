@@ -2,79 +2,45 @@
 
 module Sunbird
   class Level
-    Tile = Data.define(
-      :render_key,
-      :glyph,
-      :passable
-    )
-
-    Spawn = Data.define(
-      :key,
-      :entity,
-      :x,
-      :y
-    )
-
-    Relation = Data.define(
-      :kind,
-      :source,
-      :target
-    )
+    Tile = Data.define(:render_key, :glyph, :passable)
+    Spawn = Data.define(:key, :prototype, :x, :y)
+    Entry = Data.define(:key, :x, :y, :facing)
+    Relation = Data.define(:kind, :source, :target)
 
     Definition = Data.define(
       :name,
       :tiles,
       :rows,
       :spawns,
+      :entries,
       :relations,
-      :entry_spawn
+      :default_entry
     )
 
     module Definitions
     end
 
-    attr_reader :name,
-      :terrain,
-      :spawns,
-      :relations,
-      :entry_spawn
+    attr_reader :name, :terrain, :spawns, :entries, :relations, :default_entry
 
-    def initialize(
-      name:,
-      terrain:,
-      spawns:,
-      relations:,
-      entry_spawn:
-    )
+    def initialize(name:, terrain:, spawns:, relations:, entries: [], default_entry: nil)
       @name = name
       @terrain = terrain
       @spawns = spawns.dup.freeze
+      @entries = entries.dup.freeze
       @relations = relations.dup.freeze
-      @entry_spawn = entry_spawn
+      @default_entry = default_entry
     end
 
-    def width
-      terrain.width
+    def entry(key = default_entry)
+      entries.find { |entry| entry.key == key } ||
+        raise(KeyError, "unknown level entry: #{key.inspect}")
     end
 
-    def height
-      terrain.height
-    end
-
-    def inside?(x, y)
-      terrain.inside?(x, y)
-    end
-
-    def glyph_at(x, y)
-      terrain.glyph_at(x, y)
-    end
-
-    def render_key_at(x, y)
-      terrain.render_key_at(x, y)
-    end
-
-    def passable?(x, y)
-      terrain.passable?(x, y)
-    end
+    def width = terrain.width
+    def height = terrain.height
+    def inside?(x, y) = terrain.inside?(x, y)
+    def glyph_at(x, y) = terrain.glyph_at(x, y)
+    def render_key_at(x, y) = terrain.render_key_at(x, y)
+    def passable?(x, y) = terrain.passable?(x, y)
   end
 end

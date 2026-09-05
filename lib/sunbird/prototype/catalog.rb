@@ -1,24 +1,24 @@
 # frozen_string_literal: true
 
 module Sunbird
-  class Entity
+  class Prototype
     class Catalog
-      def initialize(entities)
-        @entities = entities.to_h do |entity|
-          [entity.name, entity]
+      def initialize(prototypes)
+        @prototypes = prototypes.to_h do |prototype|
+          [prototype.name, prototype]
         end.freeze
       end
 
       def fetch(name)
-        @entities.fetch(name)
+        @prototypes.fetch(name)
       end
 
       def include?(name)
-        @entities.key?(name)
+        @prototypes.key?(name)
       end
 
       def names
-        @entities.keys.freeze
+        @prototypes.keys.freeze
       end
     end
 

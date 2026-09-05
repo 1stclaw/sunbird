@@ -2,111 +2,117 @@
 
 module Sunbird
   class Simulation
+    StepResult = Data.define(:number, :effects)
+
     attr_reader :level, :step_number
 
-    def initialize(
-      level:,
-      entities:,
-      relevance: Relevance.new
-    )
+    def initialize(level:, prototypes:)
       @level = level
-      @area_state = AreaState.new
+      @prototypes = prototypes
+      @world = World.new
+      @bindings = Bindings.new
       @step_number = 0
+      @executor = Executor.new
+      @reference_ids = {}
 
-      movement = Movement.new
-      @planner = Planner.new(
-        relevance: relevance,
-        pathfinder: Pathfinder.new(movement: movement)
-      )
-      @resolver = Resolver.new(movement: movement)
-
-      @spawn_ids = instantiate_spawns(
-        level.spawns,
-        entities
-      ).freeze
-      instantiate_relations(level.relations, @spawn_ids)
-    end
-
-    def plan(input:, controlled_id:)
-      @planner.build(
-        input: input,
-        level: @level,
-        world: @area_state.view,
-        controlled_id: controlled_id
-      )
+      instantiate_spawns
+      resolve_relations
     end
 
     def step(commands:)
-      effects = @resolver.resolve(
-        area: @area_state,
-        level: @level,
-        commands: commands
+      effects = @executor.execute(
+        level: level,
+        world: @world,
+        commands: commands,
+        bindings: @bindings
       )
 
       @step_number += 1
-
-      yield effects if block_given?
-
-      @step_number
+      StepResult.new(number: @step_number, effects: effects)
     end
 
-    def bind_actor(actor_key:, instance_id:)
-      unless @area_state.instance?(instance_id)
+    def spawn_character(character_key:, prototype:, entry: level.default_entry)
+      entry_definition = level.entry(entry)
+      prototype_definition = @prototypes.fetch(prototype)
+
+      if prototype_definition.components.key?(:health)
         raise ArgumentError,
-          "unknown instance_id for actor binding: #{instance_id.inspect}"
+          "persistent character prototype must not define local Health"
       end
 
-      @area_state.set_component(
-        instance_id,
-        :actor_ref,
-        AreaState::ActorRef.new(
-          actor_key: actor_key.to_sym
-        )
+      if @reference_ids.key?(entry_definition.key)
+        raise ArgumentError,
+          "level entry already occupied: #{entry_definition.key.inspect}"
+      end
+
+      extra = {}
+      if entry_definition.facing
+        extra[:facing] = Component::Facing.new(direction: entry_definition.facing)
+      end
+
+      entity_id = instantiate(
+        prototype_definition,
+        x: entry_definition.x,
+        y: entry_definition.y,
+        extra_components: extra
       )
+
+      @bindings.bind(character_key: character_key, entity_id: entity_id)
+      @reference_ids[entry_definition.key] = entity_id
+      resolve_relations
+      entity_id
     end
 
-    def area_view
-      @area_state.view
+    def entity_id_for_character(character_key)
+      @bindings.entity_for(character_key)
     end
 
-    # Transitional v0.4 compatibility alias.
-    alias world_view area_view
+    def character_key_for_entity(entity_id)
+      @bindings.character_for(entity_id)
+    end
 
-    def instance_id_for_spawn(spawn_key)
-      @spawn_ids.fetch(spawn_key)
+    def entity_id_for_spawn(spawn_key)
+      @reference_ids.fetch(spawn_key)
+    end
+
+    def world_view
+      @world.view
     end
 
     private
 
-    def instantiate_spawns(spawns, entities)
-      spawns.to_h do |spawn|
-        entity = entities.fetch(spawn.entity)
-        [spawn.key, instantiate(entity, spawn)]
-      end
-    end
-
-    def instantiate_relations(relations, spawn_ids)
-      relations.each do |relation|
-        @area_state.add_relation(
-          kind: relation.kind,
-          source_id: spawn_ids.fetch(relation.source),
-          target_id: spawn_ids.fetch(relation.target)
-        )
-      end
-    end
-
-    def instantiate(entity, spawn)
-      components = entity.components.merge(
-        entity_ref: AreaState::EntityRef.new(
-          name: entity.name
-        ),
-        position: AreaState::Position.new(
+    def instantiate_spawns
+      level.spawns.each do |spawn|
+        prototype = @prototypes.fetch(spawn.prototype)
+        @reference_ids[spawn.key] = instantiate(
+          prototype,
           x: spawn.x,
           y: spawn.y
         )
-      )
+      end
+    end
 
-      @area_state.spawn(**components)
+    def instantiate(prototype, x:, y:, extra_components: {})
+      components = prototype.components.merge(
+        prototype_ref: Component::PrototypeRef.new(name: prototype.name),
+        position: Component::Position.new(x: x, y: y)
+      ).merge(extra_components)
+
+      @world.spawn(**components)
+    end
+
+    def resolve_relations
+      level.relations.each do |relation|
+        source_id = @reference_ids[relation.source]
+        target_id = @reference_ids[relation.target]
+        next unless source_id && target_id
+
+        @world.add_relation(
+          kind: relation.kind,
+          source_id: source_id,
+          target_id: target_id
+        )
+      end
     end
   end
 end

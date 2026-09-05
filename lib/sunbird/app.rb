@@ -2,63 +2,45 @@
 
 module Sunbird
   class App
-    ENTITY_PATH = File.expand_path(
-      "../../content/entities/actors.rb",
+    PROTOTYPE_PATH = File.expand_path(
+      "../../content/prototypes/actors.rb",
       __dir__
     )
-
     LEVEL_PATH = File.expand_path(
       "../../content/levels/test_field.rb",
       __dir__
     )
-
     DIALOGUE_PATH = File.expand_path(
       "../../content/dialogue/test_field.rb",
       __dir__
     )
 
     def initialize(env: ENV)
-      entities = Entity::Loader.load(ENTITY_PATH)
-      level = Level::Loader.load(
-        LEVEL_PATH,
-        entities: entities
-      )
+      prototypes = Prototype::Loader.load(PROTOTYPE_PATH)
+      level = Level::Loader.load(LEVEL_PATH, prototypes: prototypes)
       dialogues = Dialogue::Loader.load(DIALOGUE_PATH)
 
       @session = Session.new(
-        party: Party.new(
-          members: [:hero, :mage],
-          leader: :hero
-        ),
-        actors: {
-          hero: ActorState.new(
-            vitals: ActorState::Vitals.new(
-              hp: 10,
-              max_hp: 10,
-              mp: 4,
-              max_mp: 4
-            ),
-            stats: ActorState::Stats.new(
-              attack: 2
-            )
+        party: Party.new(members: [:hero, :mage], leader: :hero),
+        characters: {
+          hero: Character.new(
+            hp: 10, max_hp: 10,
+            mp: 4, max_mp: 4,
+            attack: 2
           ),
-          mage: ActorState.new(
-            vitals: ActorState::Vitals.new(
-              hp: 8,
-              max_hp: 8,
-              mp: 8,
-              max_mp: 8
-            ),
-            stats: ActorState::Stats.new(
-              attack: 1
-            )
+          mage: Character.new(
+            hp: 8, max_hp: 8,
+            mp: 8, max_mp: 8,
+            attack: 1
           )
         }
       )
 
-      simulation = Simulation.new(
-        level: level,
-        entities: entities
+      simulation = Simulation.new(level: level, prototypes: prototypes)
+      simulation.spawn_character(
+        character_key: @session.party.leader,
+        prototype: :player,
+        entry: level.default_entry
       )
 
       @modes = ModeStack.new
@@ -84,20 +66,16 @@ module Sunbird
 
       loop do
         draw
-
         physical_event = @host.read_event
         action = @mapper.map(physical_event)
         next unless action
 
         @handoff.push(action)
         @handoff.flip!
-        snapshot = Input::Snapshot.from(
-          @handoff.take_completed
-        )
+        snapshot = Input::Snapshot.from(@handoff.take_completed)
 
         result = @modes.current.advance(input: snapshot)
         break if result == :quit
-
         apply_mode_result(result)
       end
     ensure
@@ -118,10 +96,7 @@ module Sunbird
 
     def draw
       mode = @modes.current
-      scene = @projector.project(
-        level: mode.level,
-        area: mode.area_view
-      )
+      scene = @projector.project(level: mode.level, world: mode.world_view)
       synchronized = @renderer.synchronized_updates?
       @host.begin_synchronized_update if synchronized
 
@@ -139,13 +114,11 @@ module Sunbird
 
     def status_text(mode)
       return mode.status_text if mode.respond_to?(:status_text)
-
       "Q or Esc to quit. Step #{mode.step_number}"
     end
 
     def finish_renderer
       return unless @renderer.respond_to?(:finish)
-
       output = @renderer.finish
       @host.write(output) unless output.empty?
     end

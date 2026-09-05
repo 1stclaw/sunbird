@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 module Sunbird
-  class Entity
+  class Prototype
     module Loader
       module_function
 
       def load(path)
         absolute_path = Content::RubySource.absolute_path(
           path,
-          kind: :entity
+          kind: :prototype
         )
 
         require absolute_path

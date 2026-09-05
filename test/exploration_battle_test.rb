@@ -9,33 +9,31 @@ class ExplorationBattleTest < Minitest::Test
     level = level_with(
       spawns: [
         Sunbird::Level::Spawn.new(
-          key: :hero,
-          entity: :player,
-          x: 2,
-          y: 2
-        ),
-        Sunbird::Level::Spawn.new(
           key: :goblin,
-          entity: :goblin,
+          prototype: :goblin,
           x: 3,
           y: 2
         )
       ],
-      entry_spawn: :hero
+      entries: [default_entry(x: 2, y: 2, facing: :east)],
+      default_entry: :start
     )
     simulation = Sunbird::Simulation.new(
       level: level,
-      entities: actor_catalog
+      prototypes: prototype_catalog
+    )
+    session = test_session
+    simulation.spawn_character(
+      character_key: :hero,
+      prototype: :player
     )
     mode = Sunbird::Mode::Exploration.new(
       simulation: simulation,
-      session: test_session,
+      session: session,
       dialogues: dialogue_catalog
     )
 
-    mode.advance(input: move_input(:move_east))
     before = mode.step_number
-
     result = mode.advance(input: action_input(:interact))
 
     assert_instance_of Sunbird::Mode::Push, result

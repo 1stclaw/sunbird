@@ -9,7 +9,7 @@ class AsciiRendererPolicyTest < Minitest::Test
       width: 2,
       height: 3,
       tiles: [],
-      instances: []
+      entities: []
     )
 
     assert renderer.clear_before_render?

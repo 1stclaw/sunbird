@@ -6,128 +6,93 @@ class AttackTest < Minitest::Test
   def setup
     @level = Sunbird::Level.new(
       name: :test,
-      terrain: Sunbird::Level::Terrain.new(
-        width: 5,
-        height: 5
-      ),
+      terrain: Sunbird::Level::Terrain.new(width: 5, height: 5),
       spawns: [],
-      relations: [],
-      entry_spawn: nil
+      relations: []
     )
+    @executor = Sunbird::Simulation::Executor.new
+    @bindings = Sunbird::Simulation::Bindings.new
   end
 
   def test_adjacent_attack_reduces_local_health
-    area = Sunbird::AreaState.new
-
-    attacker_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 1,
-        y: 1
-      )
+    world = Sunbird::World.new
+    attacker = world.spawn(
+      position: Sunbird::Component::Position.new(x: 1, y: 1)
     )
-    target_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 2,
-        y: 1
-      ),
-      health: Sunbird::AreaState::Health.new(
-        current: 10,
-        max: 10
-      )
+    target = world.spawn(
+      position: Sunbird::Component::Position.new(x: 2, y: 1),
+      health: Sunbird::Component::Health.new(current: 10, max: 10)
     )
 
-    effects = resolve(
-      area,
+    effects = execute(
+      world,
       Sunbird::Simulation::Commands::Attack.new(
-        attacker_id: attacker_id,
-        target_id: target_id,
+        attacker_id: attacker,
+        target_id: target,
         damage: 1
       )
     )
 
-    assert_equal 9, area.component(target_id, :health).current
+    assert_equal 9, world.component(target, :health).current
     assert_empty effects
   end
 
-  def test_adjacent_attack_on_bound_actor_emits_persistent_damage
-    area = Sunbird::AreaState.new
-
-    attacker_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 1,
-        y: 1
-      )
+  def test_adjacent_attack_on_bound_character_emits_persistent_damage
+    world = Sunbird::World.new
+    attacker = world.spawn(
+      position: Sunbird::Component::Position.new(x: 1, y: 1)
     )
-    target_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 2,
-        y: 1
-      ),
-      actor_ref: Sunbird::AreaState::ActorRef.new(
-        actor_key: :hero
-      )
+    target = world.spawn(
+      position: Sunbird::Component::Position.new(x: 2, y: 1)
     )
+    @bindings.bind(character_key: :hero, entity_id: target)
 
-    effects = resolve(
-      area,
+    effects = execute(
+      world,
       Sunbird::Simulation::Commands::Attack.new(
-        attacker_id: attacker_id,
-        target_id: target_id,
+        attacker_id: attacker,
+        target_id: target,
         damage: 2
       )
     )
 
     assert_equal 1, effects.length
     effect = effects.first
-
-    assert_instance_of Sunbird::Effects::DamageActor, effect
-    assert_equal :hero, effect.actor_key
+    assert_instance_of Sunbird::Effect::DamageCharacter, effect
+    assert_equal :hero, effect.character_key
     assert_equal 2, effect.amount
-    assert_nil area.component(target_id, :health)
+    assert_nil world.component(target, :health)
   end
 
-  def test_resolver_rejects_attack_when_target_is_not_adjacent
-    area = Sunbird::AreaState.new
-
-    attacker_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 1,
-        y: 1
-      )
+  def test_attack_is_rejected_when_target_is_not_adjacent
+    world = Sunbird::World.new
+    attacker = world.spawn(
+      position: Sunbird::Component::Position.new(x: 1, y: 1)
     )
-    target_id = area.spawn(
-      position: Sunbird::AreaState::Position.new(
-        x: 3,
-        y: 1
-      ),
-      health: Sunbird::AreaState::Health.new(
-        current: 10,
-        max: 10
-      )
+    target = world.spawn(
+      position: Sunbird::Component::Position.new(x: 3, y: 1),
+      health: Sunbird::Component::Health.new(current: 10, max: 10)
     )
 
-    effects = resolve(
-      area,
+    assert_empty execute(
+      world,
       Sunbird::Simulation::Commands::Attack.new(
-        attacker_id: attacker_id,
-        target_id: target_id,
+        attacker_id: attacker,
+        target_id: target,
         damage: 1
       )
     )
-
-    assert_equal 10, area.component(target_id, :health).current
-    assert_empty effects
+    assert_equal 10, world.component(target, :health).current
   end
 
   private
 
-  def resolve(area, command)
-    Sunbird::Simulation::Resolver.new.resolve(
-      area: area,
+  def execute(world, command)
+    @executor.execute(
+      world: world,
       level: @level,
-      commands: Sunbird::Simulation::Commands::Buffer.new(
-        [command]
-      )
+      bindings: @bindings,
+      commands: Sunbird::Simulation::Commands::Buffer.new([command])
     )
   end
 end

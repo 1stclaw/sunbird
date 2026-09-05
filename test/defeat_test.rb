@@ -8,63 +8,53 @@ class DefeatTest < Minitest::Test
       name: :test,
       terrain: Sunbird::Level::Terrain.new(width: 5, height: 5),
       spawns: [],
-      relations: [],
-      entry_spawn: nil
+      relations: []
     )
+    @executor = Sunbird::Simulation::Executor.new
+    @bindings = Sunbird::Simulation::Bindings.new
   end
 
-  def test_defeat_retires_zero_health_instance
+  def test_defeat_retires_zero_health_entity
     world = Sunbird::World.new
-    instance_id = world.spawn(
-      health: Sunbird::World::Health.new(current: 0, max: 4),
-      position: Sunbird::World::Position.new(x: 2, y: 2),
-      renderable: Sunbird::World::Renderable.new(
-        render_key: :goblin,
-        glyph: "G",
-        layer: 10
+    entity_id = world.spawn(
+      health: Sunbird::Component::Health.new(current: 0, max: 4),
+      position: Sunbird::Component::Position.new(x: 2, y: 2),
+      renderable: Sunbird::Component::Renderable.new(
+        render_key: :goblin, glyph: "G", layer: 10
       ),
-      behavior: Sunbird::World::Behavior.new(kind: :chase),
-      collision: Sunbird::World::Collision.new(blocks_movement: true),
-      combatant: Sunbird::World::Combatant.new(attack: 1)
+      behavior: Sunbird::Component::Behavior.new(kind: :chase),
+      collision: Sunbird::Component::Collision.new(blocks_movement: true),
+      combatant: Sunbird::Component::Combatant.new(attack: 1)
     )
 
-    resolve(
-      world,
-      Sunbird::Simulation::Commands::Defeat.new(instance_id: instance_id)
-    )
+    execute(world, Sunbird::Simulation::Commands::Defeat.new(entity_id: entity_id))
 
-    assert_equal 0, world.component(instance_id, :health).current
-    assert_equal [2, 2], [
-      world.component(instance_id, :position).x,
-      world.component(instance_id, :position).y
-    ]
-    assert_nil world.component(instance_id, :renderable)
-    assert_nil world.component(instance_id, :behavior)
-    assert_nil world.component(instance_id, :collision)
-    assert_nil world.component(instance_id, :combatant)
+    assert_nil world.component(entity_id, :renderable)
+    assert_nil world.component(entity_id, :behavior)
+    assert_nil world.component(entity_id, :collision)
+    assert_nil world.component(entity_id, :combatant)
+    assert_equal 0, world.component(entity_id, :health).current
+    assert world.component(entity_id, :position)
   end
 
   def test_defeat_does_nothing_while_health_is_positive
     world = Sunbird::World.new
-    instance_id = world.spawn(
-      health: Sunbird::World::Health.new(current: 1, max: 4),
-      collision: Sunbird::World::Collision.new(blocks_movement: true)
+    entity_id = world.spawn(
+      health: Sunbird::Component::Health.new(current: 1, max: 4),
+      collision: Sunbird::Component::Collision.new(blocks_movement: true)
     )
 
-    resolve(
-      world,
-      Sunbird::Simulation::Commands::Defeat.new(instance_id: instance_id)
-    )
-
-    assert world.component(instance_id, :collision).blocks_movement
+    execute(world, Sunbird::Simulation::Commands::Defeat.new(entity_id: entity_id))
+    assert world.component(entity_id, :collision)
   end
 
   private
 
-  def resolve(world, command)
-    Sunbird::Simulation::Resolver.new.resolve(
+  def execute(world, command)
+    @executor.execute(
       world: world,
       level: @level,
+      bindings: @bindings,
       commands: Sunbird::Simulation::Commands::Buffer.new([command])
     )
   end

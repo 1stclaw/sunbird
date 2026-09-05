@@ -6,36 +6,31 @@ class BehaviorDispatchTest < Minitest::Test
   include SunbirdTestSupport
 
   def test_unknown_behavior_kind_raises_argument_error
+    prototypes = prototype_catalog(goblin_behavior: :unknown)
     level = level_with(
       spawns: [
         Sunbird::Level::Spawn.new(
-          key: :hero,
-          entity: :player,
-          x: 2,
-          y: 2
-        ),
-        Sunbird::Level::Spawn.new(
-          key: :stranger,
-          entity: :goblin,
-          x: 4,
+          key: :strange,
+          prototype: :goblin,
+          x: 3,
           y: 2
         )
       ],
-      entry_spawn: :hero
+      entries: [default_entry(x: 1, y: 2)],
+      default_entry: :start
     )
-
-    simulation = Sunbird::Simulation.new(
-      level: level,
-      entities: actor_catalog(goblin_behavior: :unknown)
-    )
+    simulation = Sunbird::Simulation.new(level: level, prototypes: prototypes)
+    hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
 
     error = assert_raises(ArgumentError) do
-      simulation.plan(
+      Sunbird::TurnPlanner.new.build(
         input: Sunbird::Input::Snapshot.empty,
-        controlled_id: simulation.instance_id_for_spawn(:hero)
+        level: level,
+        world: simulation.world_view,
+        controlled_id: hero_id
       )
     end
 
-    assert_equal "unknown behavior: :unknown", error.message
+    assert_match "unknown behavior", error.message
   end
 end

@@ -24,8 +24,8 @@ module Sunbird
           cells[tile.y][tile.x] = tile.fallback_glyph
         end
 
-        scene.instances.sort_by(&:layer).each do |instance|
-          cells[instance.y][instance.x] = instance.fallback_glyph
+        scene.entities.sort_by(&:layer).each do |entity|
+          cells[entity.y][entity.x] = entity.fallback_glyph
         end
 
         cells.map(&:join).join("\n")

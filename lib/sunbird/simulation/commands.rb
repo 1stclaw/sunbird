@@ -3,15 +3,15 @@
 module Sunbird
   class Simulation
     module Commands
-      Move = Data.define(:instance_id, :dx, :dy)
+      Move = Data.define(:entity_id, :dx, :dy)
       Attack = Data.define(:attacker_id, :target_id, :damage)
-      Defeat = Data.define(:instance_id)
+      Defeat = Data.define(:entity_id)
 
       class Buffer
         include Enumerable
 
         def initialize(commands)
-          @commands = commands.freeze
+          @commands = commands.dup.freeze
         end
 
         def each(&block)

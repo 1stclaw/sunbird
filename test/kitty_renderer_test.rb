@@ -84,7 +84,7 @@ class KittyRendererTest < Minitest::Test
         width: 1,
         height: 1,
         tiles: [],
-        instances: []
+        entities: []
       )
       output = renderer.render(empty_scene)
 
@@ -122,7 +122,7 @@ class KittyRendererTest < Minitest::Test
           fallback_glyph: "."
         )
       ],
-      instances: []
+      entities: []
     )
 
     assert_includes renderer.render(scene), "\e[1;1H."
@@ -136,7 +136,7 @@ class KittyRendererTest < Minitest::Test
       width: 2,
       height: 3,
       tiles: [],
-      instances: []
+      entities: []
     )
 
     refute renderer.clear_before_render?
@@ -170,9 +170,9 @@ class KittyRendererTest < Minitest::Test
       width: 2,
       height: 1,
       tiles: [],
-      instances: [
-        Sunbird::Render::Scene::Instance.new(
-          instance_id: 5,
+      entities: [
+        Sunbird::Render::Scene::Entity.new(
+          entity_id: 5,
           x: x,
           y: 0,
           render_key: :hero,

@@ -50,54 +50,56 @@ module Sunbird
         ].map!(&:freeze).freeze,
         spawns: [
           Spawn.new(
-            key: :player,
-            entity: :player,
-            x: 3,
-            y: 3
-          ),
-          Spawn.new(
             key: :villager,
-            entity: :villager,
+            prototype: :villager,
             x: 5,
             y: 3
           ),
           Spawn.new(
             key: :goblin_a,
-            entity: :goblin,
+            prototype: :goblin,
             x: 35,
             y: 3
           ),
           Spawn.new(
             key: :goblin_b,
-            entity: :goblin,
+            prototype: :goblin,
             x: 14,
             y: 10
           ),
           Spawn.new(
             key: :goblin_c,
-            entity: :goblin,
+            prototype: :goblin,
             x: 32,
             y: 11
+          )
+        ].freeze,
+        entries: [
+          Entry.new(
+            key: :start,
+            x: 3,
+            y: 3,
+            facing: :south
           )
         ].freeze,
         relations: [
           Relation.new(
             kind: :targets,
             source: :goblin_a,
-            target: :player
+            target: :start
           ),
           Relation.new(
             kind: :targets,
             source: :goblin_b,
-            target: :player
+            target: :start
           ),
           Relation.new(
             kind: :targets,
             source: :goblin_c,
-            target: :player
+            target: :start
           )
         ].freeze,
-        entry_spawn: :player
+        default_entry: :start
       )
     end
   end
