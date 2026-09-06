@@ -3,20 +3,20 @@
 module Sunbird
   module Mode
     class Play
-      attr_reader :simulation, :session, :player_key, :dialogues, :planner
+      attr_reader :simulation, :session, :player_key, :dialogues, :controller
 
       def initialize(
         simulation:,
         session:,
         player_key:,
         dialogues:,
-        planner: TurnPlanner.new
+        controller: RealtimeController.new
       )
         @simulation = simulation
         @session = session
         @player_key = player_key.to_sym
         @dialogues = dialogues
-        @planner = planner
+        @controller = controller
 
         validate_player!
       end
@@ -26,7 +26,8 @@ module Sunbird
         return :quit if input.pressed?(:cancel)
 
         if input.pressed?(:interact)
-          return interaction_transition || :idle
+          transition = interaction_transition
+          return transition if transition
         end
 
         commands = commands_for(input)
@@ -48,17 +49,22 @@ module Sunbird
 
       def status_text
         player = player_character
-        "#{player_key.to_s.capitalize} "           "HP #{player.hp}/#{player.max_hp} "           "MP #{player.mp}/#{player.max_mp} | "           "WASD/arrows move. Space attack. Enter interact. "           "Q or Esc quit. Step #{step_number}"
+        "#{player_key.to_s.capitalize} " \
+          "HP #{player.hp}/#{player.max_hp} " \
+          "MP #{player.mp}/#{player.max_mp} | " \
+          "WASD/arrows move. Space attack. Enter interact. " \
+          "Q or Esc quit. Tick #{step_number}"
       end
 
       private
 
       def commands_for(input)
-        planned = planner.build(
+        planned = controller.build(
           input: input,
           level: level,
           world: world_view,
-          controlled_id: controlled_entity_id
+          controlled_id: controlled_entity_id,
+          tick_number: simulation.step_number + 1
         )
 
         return planned unless input.pressed?(:attack)
@@ -86,7 +92,9 @@ module Sunbird
         ]
 
         if damage >= health.current
-          commands << Simulation::Commands::Defeat.new(entity_id: target_id)
+          commands << Simulation::Commands::Defeat.new(
+            entity_id: target_id
+          )
         end
 
         commands

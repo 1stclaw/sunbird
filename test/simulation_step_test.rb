@@ -60,14 +60,21 @@ class SimulationStepTest < Minitest::Test
   end
 
   def test_planning_is_outside_simulation_and_does_not_advance_world
-    planner = Sunbird::TurnPlanner.new
-    commands = planner.build(
+    controller = Sunbird::RealtimeController.new(
+      player_move_interval: 1,
+      npc_interval: 1
+    )
+    commands = controller.build(
       input: move_input(:move_east),
       level: @simulation.level,
       world: @simulation.world_view,
-      controlled_id: @hero_id
+      controlled_id: @hero_id,
+      tick_number: 1
     )
-    position = @simulation.world_view.component(@hero_id, :position)
+    position = @simulation.world_view.component(
+      @hero_id,
+      :position
+    )
 
     assert_equal 1, commands.size
     assert_equal [2, 2], [position.x, position.y]

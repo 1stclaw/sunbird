@@ -4,29 +4,33 @@ module Sunbird
   module Input
     class Snapshot
       def self.from(actions)
-        states = {}
-
-        actions.each do |action|
-          states[action.kind] = action.state
-        end
-
-        new(states)
+        Tracker.new.snapshot(actions)
       end
 
       def self.empty
-        new({})
+        new(
+          held: {},
+          pressed: {},
+          released: {}
+        )
       end
 
-      def initialize(states)
-        @states = states.dup.freeze
+      def initialize(held:, pressed:, released:)
+        @held = held.dup.freeze
+        @pressed = pressed.dup.freeze
+        @released = released.dup.freeze
       end
 
-      def state(kind)
-        @states[kind]
+      def held?(kind)
+        @held.key?(kind)
       end
 
       def pressed?(kind)
-        state(kind) == :pressed
+        @pressed.key?(kind)
+      end
+
+      def released?(kind)
+        @released.key?(kind)
       end
     end
   end

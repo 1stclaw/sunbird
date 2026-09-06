@@ -5,7 +5,7 @@ require_relative "test_helper"
 class BehaviorDispatchTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_unknown_behavior_kind_raises_argument_error
+  def test_unknown_behavior_kind_raises_argument_error_when_npc_tick_is_due
     prototypes = prototype_catalog(goblin_behavior: :unknown)
     level = level_with(
       spawns: [
@@ -21,13 +21,15 @@ class BehaviorDispatchTest < Minitest::Test
     )
     simulation = Sunbird::Simulation.new(level: level, prototypes: prototypes)
     hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
+    controller = Sunbird::RealtimeController.new(npc_interval: 1)
 
     error = assert_raises(ArgumentError) do
-      Sunbird::TurnPlanner.new.build(
+      controller.build(
         input: Sunbird::Input::Snapshot.empty,
         level: level,
         world: simulation.world_view,
-        controlled_id: hero_id
+        controlled_id: hero_id,
+        tick_number: 1
       )
     end
 

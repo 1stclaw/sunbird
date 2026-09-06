@@ -5,7 +5,7 @@ require_relative "test_helper"
 class ChaseBehaviorTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_adjacent_chaser_damages_bound_persistent_character
+  def test_adjacent_chaser_damages_bound_persistent_character_on_npc_tick
     simulation, session, hero_id = build_simulation(
       hero_position: [3, 3],
       goblin_position: [2, 3]
@@ -18,7 +18,7 @@ class ChaseBehaviorTest < Minitest::Test
     assert_nil simulation.world_view.component(hero_id, :health)
   end
 
-  def test_chaser_moves_toward_non_adjacent_target
+  def test_chaser_moves_toward_non_adjacent_target_on_npc_tick
     simulation, _session, hero_id = build_simulation(
       hero_position: [5, 3],
       goblin_position: [2, 3]
@@ -97,11 +97,13 @@ class ChaseBehaviorTest < Minitest::Test
   end
 
   def plan_and_step(simulation, hero_id)
-    commands = Sunbird::TurnPlanner.new.build(
+    controller = Sunbird::RealtimeController.new(npc_interval: 1)
+    commands = controller.build(
       input: Sunbird::Input::Snapshot.empty,
       level: simulation.level,
       world: simulation.world_view,
-      controlled_id: hero_id
+      controlled_id: hero_id,
+      tick_number: 1
     )
     simulation.step(commands: commands)
   end

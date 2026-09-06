@@ -15,8 +15,12 @@ module Sunbird
       __dir__
     )
     PLAYER_KEY = :player
+    TICK_HZ = Realtime::TICK_HZ
 
-    def initialize(env: ENV)
+    def initialize(
+      env: ENV,
+      clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
+    )
       prototypes = Prototype::Loader.load(PROTOTYPE_PATH)
       level = Level::Loader.load(LEVEL_PATH, prototypes: prototypes)
       dialogues = Dialogue::Loader.load(DIALOGUE_PATH)
@@ -51,28 +55,49 @@ module Sunbird
       )
       @mapper = Input::Mapper.new
       @handoff = Input::Handoff.new
+      @input_tracker = Input::Tracker.new
       @projector = Render::Projector.new
       @host = Host::Terminal.new(env: env)
       @renderer = Render::Selector.build(
         capabilities: @host.capabilities
       )
+      @clock = clock
+      @fixed_step = FixedStep.new(hz: TICK_HZ)
     end
 
     def run
       @host.enter_application
+      @fixed_step.start(@clock.call)
+      draw
 
       loop do
-        draw
-        physical_event = @host.read_event
-        action = @mapper.map(physical_event)
-        next unless action
-        @handoff.push(action)
-        @handoff.flip!
-        snapshot = Input::Snapshot.from(@handoff.take_completed)
+        poll_input
+        now = @clock.call
+        due = @fixed_step.due_steps(now)
 
-        result = @modes.current.advance(input: snapshot)
-        break if result == :quit
-        apply_mode_result(result)
+        if due.zero?
+          @host.wait_for_input(
+            timeout: @fixed_step.wait_time(now)
+          )
+          next
+        end
+
+        should_quit = false
+
+        due.times do
+          snapshot = take_input_snapshot
+          result = @modes.current.advance(input: snapshot)
+
+          if result == :quit
+            should_quit = true
+            break
+          end
+
+          apply_mode_result(result)
+        end
+
+        break if should_quit
+        draw
       end
     ensure
       finish_renderer
@@ -80,6 +105,20 @@ module Sunbird
     end
 
     private
+
+    def poll_input
+      @host.poll_events.each do |physical_event|
+        action = @mapper.map(physical_event)
+        @handoff.push(action) if action
+      end
+    end
+
+    def take_input_snapshot
+      @handoff.flip!
+      @input_tracker.snapshot(
+        @handoff.take_completed
+      )
+    end
 
     def apply_mode_result(result)
       case result
@@ -92,7 +131,10 @@ module Sunbird
 
     def draw
       mode = @modes.current
-      scene = @projector.project(level: mode.level, world: mode.world_view)
+      scene = @projector.project(
+        level: mode.level,
+        world: mode.world_view
+      )
       synchronized = @renderer.synchronized_updates?
       @host.begin_synchronized_update if synchronized
       begin
@@ -109,7 +151,7 @@ module Sunbird
 
     def status_text(mode)
       return mode.status_text if mode.respond_to?(:status_text)
-      "Q or Esc to quit. Step #{mode.step_number}"
+      "Q or Esc to quit. Tick #{mode.step_number}"
     end
 
     def finish_renderer

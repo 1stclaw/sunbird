@@ -45,7 +45,7 @@ class HostTerminalTest < Minitest::Test
     assert_equal :legacy, host.capabilities.keyboard_protocol
   end
 
-  def test_terminal_reports_kitty_graphics_capability
+  def test_terminal_reports_kitty_graphics_and_keyboard_capabilities
     host = Sunbird::Host::Terminal.new(
       output: StringIO.new,
       input_adapter: FakeInput.new(:right),
@@ -53,9 +53,10 @@ class HostTerminalTest < Minitest::Test
     )
 
     assert_equal :kitty, host.capabilities.graphics_protocol
+    assert_equal :kitty, host.capabilities.keyboard_protocol
   end
 
-  def test_application_lifecycle_uses_alternate_screen
+  def test_application_lifecycle_enables_kitty_keyboard_on_alt_screen
     output = StringIO.new
     host = host_with(output)
 
@@ -63,13 +64,13 @@ class HostTerminalTest < Minitest::Test
     host.leave_application
 
     assert_equal(
-      "\e[?1049h\e[2J\e[H\e[?25l" \
-      "\e[?25h\e[?1049l",
+      "\e[?1049h\e[2J\e[H\e[?25l\e[>10u" \
+      "\e[<u\e[?25h\e[?1049l",
       output.string
     )
   end
 
-  def test_application_lifecycle_owns_raw_input_mode
+  def test_application_lifecycle_owns_nonblocking_raw_input_mode
     output = StringIO.new
     input = FakeConsole.new(mode: :original)
     host = Sunbird::Host::Terminal.new(
@@ -80,7 +81,7 @@ class HostTerminalTest < Minitest::Test
 
     host.enter_application
 
-    assert_equal({ min: 1, time: 0 }, input.raw_options)
+    assert_equal({ min: 0, time: 0 }, input.raw_options)
 
     host.leave_application
 
@@ -91,9 +92,9 @@ class HostTerminalTest < Minitest::Test
     output = StringIO.new
     host = host_with(output)
 
-    host.write_status(row: 15, text: "Step 4")
+    host.write_status(row: 15, text: "Tick 4")
 
-    assert_equal "\e[15;1H\e[2KStep 4", output.string
+    assert_equal "\e[15;1H\e[2KTick 4", output.string
     refute_includes output.string, "\e[2J"
   end
 

@@ -19,6 +19,18 @@ class InputMapperTest < Minitest::Test
     assert_equal :attack, @mapper.map(:space).kind
   end
 
+  def test_mapper_preserves_kitty_event_state
+    physical = Sunbird::Host::KeyEvent.new(
+      key: :w,
+      state: :released
+    )
+
+    action = @mapper.map(physical)
+
+    assert_equal :move_north, action.kind
+    assert_equal :released, action.state
+  end
+
   def test_q_still_maps_to_quit
     assert_equal :quit, @mapper.map(:q).kind
   end

@@ -4,7 +4,7 @@ Sunbird is an experimental Ruby game-runtime project for testing small, explicit
 
 The latest released line is **v0.3d**. This branch is `v0.4-solo`, the single-character action-RPG experiment built from the common v0.4 runtime foundation. Its gameplay direction is closer to the Heretic/Hexen lineage than to the primary JRPG-oriented Sunbird line.
 
-The first solo milestone deliberately remains discrete/turn-stepped while removing JRPG battle policy: combat happens directly in the map, Party is absent, and Space is a dedicated attack action. Real-time scheduling comes later.
+The solo branch now has a fixed-step timing/input spike: combat remains grid-based and direct in the map, while a 30 Hz engine clock advances the World independently of keyboard activity. Kitty press/repeat/release events provide real held-key state.
 
 The v0.4 work is deliberately renderer-independent. Kitty remains the active presentation backend; Raylib can be introduced later without defining the architecture version.
 
@@ -44,7 +44,8 @@ Important terminology:
 - `Simulation::Commands::Buffer` — explicit batch of gameplay commands; deliberately retained in v0.4.
 - `Simulation::Executor` — validates/applies commands to the World and emits persistent effects.
 - `Simulation::StepResult` — explicit result containing the new step number and emitted effects.
-- `TurnPlanner` — temporary discrete command producer for player movement and NPC behavior on the first solo milestone. It is no longer owned by Simulation.
+- `RealtimeController` — solo command producer that schedules held player movement and NPC behavior on explicit fixed-tick cadences.
+- `Input::Tracker` — converts key press/repeat/release events into held and edge-triggered per-tick input state.
 
 ## Persistent and runtime identity
 
@@ -67,7 +68,7 @@ A Level also no longer authors the persistent player as a normal spawn. It provi
 The current transition path is:
 
 ```text
-TurnPlanner / Mode
+RealtimeController / Mode
         |
         v
 Simulation::Commands::Buffer
@@ -124,7 +125,7 @@ Enter          interact / advance dialogue
 Esc / Q        quit or cancel the active dialogue
 ```
 
-Attacking is still discrete in this milestone: one Space press consumes one simulation step, and NPC behavior advances in the same command batch.
+Space remains edge-triggered, while movement is held-state driven. The World advances at 30 fixed ticks/second even with no input; player grid movement currently repeats at 5 moves/second and NPC behavior at 2 actions/second.
 
 ## Rendering
 
@@ -175,7 +176,8 @@ bundle exec ruby -Itest -e \
 
 The common foundation intentionally does **not** yet define:
 
-- the real-time solo scheduling/input policy;
+- continuous movement/geometry;
+- attack windup/active/recovery;
 - a general Intent -> Rules -> Effects framework;
 - inventory/equipment/spells;
 - persistent per-level changes;
@@ -184,4 +186,4 @@ The common foundation intentionally does **not** yet define:
 - Lua;
 - a generic ECS `System` layer.
 
-The solo branch has now diverged at gameplay policy. The next milestone is non-blocking Kitty input plus a fixed-step scheduler; continuous geometry and richer action timing remain later work.
+The solo branch has now diverged at both gameplay policy and scheduling. The next milestone is richer real-time action timing (attack phases/cooldowns and a first projectile or spell) while keeping integer grid geometry.

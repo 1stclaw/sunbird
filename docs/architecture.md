@@ -228,40 +228,50 @@ Attack bound player entity
 
 The term Executor better matches the current behavior: attack damage is already supplied by the command producer, so this object is not yet a general gameplay-rules resolver.
 
-## TurnPlanner
+## RealtimeController
 
-The current turn-oriented command producer is `TurnPlanner`.
+The solo branch no longer uses `TurnPlanner`. `RealtimeController` is outside Simulation ownership because it contains gameplay scheduling policy:
 
-It is outside Simulation ownership because it contains gameplay policy:
-
-- controlled movement from abstract input;
+- held controlled movement;
+- movement repeat cadence;
 - idle/wander/chase behavior;
+- NPC behavior cadence;
 - pathfinding decisions;
 - adjacent NPC attack intent.
 
-This keeps turn-specific policy outside Simulation. On `v0.4-solo`, TurnPlanner is now only a temporary discrete controller for movement and NPC behavior; the later fixed-step scheduler can replace it without changing World or Executor.
+The fixed engine clock is 30 Hz. Current provisional grid-action rates are centralized under `Sunbird::Realtime`: player held movement repeats at 5 moves/second and NPC behavior executes at 2 actions/second. These are tuning values for the Kitty/grid spike, not permanent physics constants.
 
-The chase path reads `Component::Combatant#attack` instead of hardcoding damage `1`, so direct play combat and NPC attacks use authored attack values.
+This keeps real-time policy outside Simulation. Simulation still receives an explicit `Commands::Buffer` and knows nothing about wall-clock time or held keyboard state.
 
-## Modes
+The chase path reads `Component::Combatant#attack`, so NPC damage continues to come from authored prototype data.
 
-Modes reference Simulation directly rather than delegating runtime access through a parent mode.
+## Fixed-step input and modes
+
+`App` owns the monotonic fixed-step loop. Kitty input is polled non-blockingly between ticks; `Input::Tracker` maintains held state and per-tick press/release edges.
 
 ```text
-Play
-├── Simulation
-├── Session
-├── player Character key
-├── TurnPlanner (temporary discrete policy)
-└── Dialogue catalog
-
-Dialogue
-└── Simulation
+Kitty key events
+      |
+      v
+Input::Tracker
+      |
+      v
+Mode::Play
+      |
+      +--> RealtimeController
+      |         |
+      |         v
+      |   Commands::Buffer
+      |
+      `--> direct attack commands
+                |
+                v
+          Simulation::step
 ```
 
-`Play` handles movement, direct adjacent attacks, and interaction in the same World. There is no pushed Battle mode on `v0.4-solo`: Space attacks and Enter interacts. The first solo milestone remains input-stepped so gameplay-policy divergence can be tested before real-time scheduling is introduced.
+Movement reads `held?`. Attack, interact, cancel, and quit use `pressed?`, so key-repeat events do not retrigger edge actions.
 
-The ModeStack still owns push/pop transitions for modal contexts such as Dialogue.
+`Play` advances Simulation on every fixed tick, including empty-command ticks. NPCs therefore keep chasing/attacking while the player is idle. Dialogue remains modal and currently pauses World advancement.
 
 ## Rendering
 

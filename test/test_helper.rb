@@ -163,13 +163,18 @@ module SunbirdTestSupport
     simulation,
     input,
     controlled_id:,
-    planner: Sunbird::TurnPlanner.new
+    controller: Sunbird::RealtimeController.new(
+      player_move_interval: 1,
+      npc_interval: 1
+    ),
+    tick_number: simulation.step_number + 1
   )
-    commands = planner.build(
+    commands = controller.build(
       input: input,
       level: simulation.level,
       world: simulation.world_view,
-      controlled_id: controlled_id
+      controlled_id: controlled_id,
+      tick_number: tick_number
     )
     simulation.step(commands: commands)
   end

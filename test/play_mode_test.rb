@@ -95,11 +95,11 @@ class PlayModeTest < Minitest::Test
     assert_equal before, @mode.step_number
   end
 
-  def test_interact_without_interactable_target_does_not_advance
+  def test_interact_without_interactable_target_does_not_pause_world
     result = @mode.advance(input: action_input(:interact))
 
-    assert_equal :idle, result
-    assert_equal 0, @mode.step_number
+    assert_equal :advanced, result
+    assert_equal 1, @mode.step_number
   end
 
   def test_quit_and_cancel_do_not_advance_simulation

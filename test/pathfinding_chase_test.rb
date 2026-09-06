@@ -5,7 +5,7 @@ require_relative "test_helper"
 class PathfindingChaseTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_chaser_routes_around_blocking_entity
+  def test_chaser_routes_around_blocking_entity_on_npc_tick
     level = level_with(
       width: 8,
       height: 6,
@@ -37,11 +37,13 @@ class PathfindingChaseTest < Minitest::Test
     hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
     hunter_id = simulation.entity_id_for_spawn(:hunter)
 
-    commands = Sunbird::TurnPlanner.new.build(
+    controller = Sunbird::RealtimeController.new(npc_interval: 1)
+    commands = controller.build(
       input: Sunbird::Input::Snapshot.empty,
       level: level,
       world: simulation.world_view,
-      controlled_id: hero_id
+      controlled_id: hero_id,
+      tick_number: 1
     )
     simulation.step(commands: commands)
 

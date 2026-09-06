@@ -21,11 +21,16 @@ class CollisionTest < Minitest::Test
     simulation = Sunbird::Simulation.new(level: level, prototypes: prototype_catalog)
     hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
 
-    commands = Sunbird::TurnPlanner.new.build(
+    controller = Sunbird::RealtimeController.new(
+      player_move_interval: 1,
+      npc_interval: 100
+    )
+    commands = controller.build(
       input: move_input(:move_east),
       level: level,
       world: simulation.world_view,
-      controlled_id: hero_id
+      controlled_id: hero_id,
+      tick_number: 1
     )
     simulation.step(commands: commands)
 
