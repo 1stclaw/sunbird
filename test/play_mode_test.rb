@@ -2,7 +2,7 @@
 
 require_relative "test_helper"
 
-class ExplorationModeTest < Minitest::Test
+class PlayModeTest < Minitest::Test
   include SunbirdTestSupport
 
   def setup
@@ -18,7 +18,6 @@ class ExplorationModeTest < Minitest::Test
       entries: [default_entry(x: 2, y: 2)],
       default_entry: :start
     )
-
     @simulation = Sunbird::Simulation.new(
       level: level,
       prototypes: prototype_catalog
@@ -28,31 +27,31 @@ class ExplorationModeTest < Minitest::Test
       character_key: :hero,
       prototype: :player
     )
-    @mode = Sunbird::Mode::Exploration.new(
+    @mode = Sunbird::Mode::Play.new(
       simulation: @simulation,
       session: @session,
+      player_key: :hero,
       dialogues: dialogue_catalog
     )
   end
 
-  def test_exploration_mode_decides_when_simulation_advances
+  def test_play_mode_decides_when_simulation_advances
     result = @mode.advance(input: move_input(:move_south))
 
     assert_equal :advanced, result
     assert_equal 1, @mode.step_number
   end
 
-  def test_party_leader_binding_is_owned_by_simulation
+  def test_controlled_character_binding_is_owned_by_simulation
     hero_id = @mode.controlled_entity_id
     position = @mode.world_view.component(hero_id, :position)
 
     assert_equal hero_id, @simulation.entity_id_for_character(:hero)
     assert_equal :hero, @simulation.character_key_for_entity(hero_id)
-    assert_nil @mode.entity_id_for_party_member(:mage)
     assert_equal [2, 2], [position.x, position.y]
   end
 
-  def test_party_leader_world_entity_has_no_persistent_combat_state
+  def test_controlled_world_entity_has_no_persistent_combat_state
     hero_id = @mode.controlled_entity_id
 
     assert_nil @mode.world_view.component(hero_id, :health)
@@ -63,11 +62,13 @@ class ExplorationModeTest < Minitest::Test
     assert_equal 2, hero.attack
   end
 
-  def test_status_uses_persistent_character
+  def test_status_uses_persistent_character_and_solo_controls
     @session.damage_character(:hero, 3)
     @session.spend_mp(:hero, 1)
 
     assert_match "Hero HP 7/10 MP 3/4", @mode.status_text
+    assert_match "Space attack", @mode.status_text
+    assert_match "Enter interact", @mode.status_text
   end
 
   def test_blocked_move_still_changes_facing
@@ -94,7 +95,7 @@ class ExplorationModeTest < Minitest::Test
     assert_equal before, @mode.step_number
   end
 
-  def test_interact_without_target_does_not_advance
+  def test_interact_without_interactable_target_does_not_advance
     result = @mode.advance(input: action_input(:interact))
 
     assert_equal :idle, result

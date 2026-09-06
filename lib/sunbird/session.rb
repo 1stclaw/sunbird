@@ -2,12 +2,8 @@
 
 module Sunbird
   class Session
-    attr_reader :party
-
-    def initialize(characters:, party: nil)
+    def initialize(characters:)
       @characters = normalize_characters(characters)
-      @party = party
-      validate_party_characters! if party
     end
 
     def character(character_key)
@@ -78,7 +74,6 @@ module Sunbird
       unless characters.is_a?(Hash)
         raise ArgumentError, "session characters must be a Hash"
       end
-
       characters.each_with_object({}) do |(key, value), result|
         normalized = normalize_key(key)
         raise ArgumentError, "duplicate character: #{normalized.inspect}" if result.key?(normalized)
@@ -87,14 +82,6 @@ module Sunbird
         end
         result[normalized] = value
       end
-    end
-
-    def validate_party_characters!
-      missing = party.members.reject { |member| @characters.key?(member) }
-      return if missing.empty?
-
-      raise ArgumentError,
-        "missing characters for party members: #{missing.inspect}"
     end
 
     def validate_effect!(effect)

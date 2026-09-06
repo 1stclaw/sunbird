@@ -81,10 +81,6 @@ module SunbirdTestSupport
 
   def test_session
     Sunbird::Session.new(
-      party: Sunbird::Party.new(
-        members: [:hero, :mage],
-        leader: :hero
-      ),
       characters: {
         hero: Sunbird::Character.new(
           hp: 10,
@@ -152,7 +148,7 @@ module SunbirdTestSupport
   def spawn_character(
     simulation,
     session,
-    character_key: session.party.leader,
+    character_key: :hero,
     prototype: :player,
     entry: simulation.level.default_entry
   )

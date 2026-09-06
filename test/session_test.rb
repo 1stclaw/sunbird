@@ -5,29 +5,13 @@ require_relative "test_helper"
 class SessionTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_session_owns_persistent_characters
+  def test_session_owns_persistent_characters_without_party_policy
     session = test_session
 
-    assert_equal [:hero, :mage], session.party.members
     assert_equal [:hero, :mage], session.character_keys
     assert_equal 10, session.character(:hero).hp
     assert_equal 4, session.character(:hero).mp
     assert_equal 2, session.character(:hero).attack
-  end
-
-  def test_session_can_exist_without_party_policy
-    character = Sunbird::Character.new(
-      hp: 10, max_hp: 10,
-      mp: 0, max_mp: 0,
-      attack: 2
-    )
-
-    session = Sunbird::Session.new(
-      characters: { player: character }
-    )
-
-    assert_nil session.party
-    assert_equal character, session.character(:player)
   end
 
   def test_damage_and_healing_replace_character
@@ -53,27 +37,6 @@ class SessionTest < Minitest::Test
 
     session.restore_mp(:hero, 99)
     assert_equal 4, session.character(:hero).mp
-  end
-
-  def test_party_members_require_characters
-    party = Sunbird::Party.new(
-      members: [:hero, :mage],
-      leader: :hero
-    )
-    hero = Sunbird::Character.new(
-      hp: 10, max_hp: 10,
-      mp: 4, max_mp: 4,
-      attack: 2
-    )
-
-    error = assert_raises(ArgumentError) do
-      Sunbird::Session.new(
-        party: party,
-        characters: { hero: hero }
-      )
-    end
-
-    assert_match "missing characters", error.message
   end
 
   def test_effect_batch_is_validated_before_mutation

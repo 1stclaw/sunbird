@@ -14,9 +14,9 @@ class InputMapperTest < Minitest::Test
     assert_equal :pressed, action.state
   end
 
-  def test_enter_and_space_map_to_interact
+  def test_enter_maps_to_interact_and_space_maps_to_attack
     assert_equal :interact, @mapper.map(:enter).kind
-    assert_equal :interact, @mapper.map(:space).kind
+    assert_equal :attack, @mapper.map(:space).kind
   end
 
   def test_q_still_maps_to_quit

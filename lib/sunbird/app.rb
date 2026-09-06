@@ -14,6 +14,7 @@ module Sunbird
       "../../content/dialogue/test_field.rb",
       __dir__
     )
+    PLAYER_KEY = :player
 
     def initialize(env: ENV)
       prototypes = Prototype::Loader.load(PROTOTYPE_PATH)
@@ -21,37 +22,33 @@ module Sunbird
       dialogues = Dialogue::Loader.load(DIALOGUE_PATH)
 
       @session = Session.new(
-        party: Party.new(members: [:hero, :mage], leader: :hero),
         characters: {
-          hero: Character.new(
-            hp: 10, max_hp: 10,
-            mp: 4, max_mp: 4,
+          PLAYER_KEY => Character.new(
+            hp: 10,
+            max_hp: 10,
+            mp: 4,
+            max_mp: 4,
             attack: 2
-          ),
-          mage: Character.new(
-            hp: 8, max_hp: 8,
-            mp: 8, max_mp: 8,
-            attack: 1
           )
         }
       )
 
       simulation = Simulation.new(level: level, prototypes: prototypes)
       simulation.spawn_character(
-        character_key: @session.party.leader,
+        character_key: PLAYER_KEY,
         prototype: :player,
         entry: level.default_entry
       )
 
       @modes = ModeStack.new
       @modes.push(
-        Mode::Exploration.new(
+        Mode::Play.new(
           simulation: simulation,
           session: @session,
+          player_key: PLAYER_KEY,
           dialogues: dialogues
         )
       )
-
       @mapper = Input::Mapper.new
       @handoff = Input::Handoff.new
       @projector = Render::Projector.new
@@ -69,7 +66,6 @@ module Sunbird
         physical_event = @host.read_event
         action = @mapper.map(physical_event)
         next unless action
-
         @handoff.push(action)
         @handoff.flip!
         snapshot = Input::Snapshot.from(@handoff.take_completed)
@@ -99,7 +95,6 @@ module Sunbird
       scene = @projector.project(level: mode.level, world: mode.world_view)
       synchronized = @renderer.synchronized_updates?
       @host.begin_synchronized_update if synchronized
-
       begin
         @host.clear if @renderer.clear_before_render?
         @host.write(@renderer.render(scene))

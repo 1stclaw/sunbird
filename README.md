@@ -2,10 +2,9 @@
 
 Sunbird is an experimental Ruby game-runtime project for testing small, explicit, data-oriented engine architecture.
 
-The latest released line is **v0.3d**. Development on `v0.4-next` is a structural cleanup intended to become the common runtime foundation for two later gameplay directions:
+The latest released line is **v0.3d**. This branch is `v0.4-solo`, the single-character action-RPG experiment built from the common v0.4 runtime foundation. Its gameplay direction is closer to the Heretic/Hexen lineage than to the primary JRPG-oriented Sunbird line.
 
-- the primary party/JRPG-oriented Sunbird line;
-- a `v0.4-solo` line for a single-character action-RPG direction closer to the Heretic/Hexen lineage.
+The first solo milestone deliberately remains discrete/turn-stepped while removing JRPG battle policy: combat happens directly in the map, Party is absent, and Space is a dedicated attack action. Real-time scheduling comes later.
 
 The v0.4 work is deliberately renderer-independent. Kitty remains the active presentation backend; Raylib can be introduced later without defining the architecture version.
 
@@ -16,8 +15,7 @@ The current development model uses a smaller set of conventional terms:
 ```text
 Session
   persistent game state
-  ├── Characters
-  └── Party (optional gameplay policy)
+  └── Characters
 
 Level
   immutable authored map/area definition
@@ -46,14 +44,14 @@ Important terminology:
 - `Simulation::Commands::Buffer` — explicit batch of gameplay commands; deliberately retained in v0.4.
 - `Simulation::Executor` — validates/applies commands to the World and emits persistent effects.
 - `Simulation::StepResult` — explicit result containing the new step number and emitted effects.
-- `TurnPlanner` — current JRPG/turn-oriented command producer. It is no longer owned by Simulation.
+- `TurnPlanner` — temporary discrete command producer for player movement and NPC behavior on the first solo milestone. It is no longer owned by Simulation.
 
 ## Persistent and runtime identity
 
 A persistent character and its current runtime entity are different things:
 
 ```text
-Session Character :hero
+Session Character :player
         |
         | Simulation binding
         v
@@ -117,6 +115,17 @@ Spawn
 
 Persistent characters enter through `Level::Entry` rather than a player spawn.
 
+## Solo controls
+
+```text
+WASD / arrows  move
+Space          attack the adjacent entity you are facing
+Enter          interact / advance dialogue
+Esc / Q        quit or cancel the active dialogue
+```
+
+Attacking is still discrete in this milestone: one Space press consumes one simulation step, and NPC behavior advances in the same command batch.
+
 ## Rendering
 
 Rendering remains separated from simulation:
@@ -166,7 +175,7 @@ bundle exec ruby -Itest -e \
 
 The common foundation intentionally does **not** yet define:
 
-- the `v0.4-solo` realtime/play-loop policy;
+- the real-time solo scheduling/input policy;
 - a general Intent -> Rules -> Effects framework;
 - inventory/equipment/spells;
 - persistent per-level changes;
@@ -175,4 +184,4 @@ The common foundation intentionally does **not** yet define:
 - Lua;
 - a generic ECS `System` layer.
 
-The next branch split should happen only after this lower state/runtime model is accepted.
+The solo branch has now diverged at gameplay policy. The next milestone is non-blocking Kitty input plus a fixed-step scheduler; continuous geometry and richer action timing remain later work.

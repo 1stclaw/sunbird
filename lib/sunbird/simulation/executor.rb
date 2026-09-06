@@ -108,6 +108,9 @@ module Sunbird
         return false unless world.entity?(command.attacker_id)
         return false unless world.entity?(command.target_id)
 
+        attacker_health = world.component(command.attacker_id, :health)
+        return false if attacker_health&.current&.zero?
+
         attacker = world.component(command.attacker_id, :position)
         target = world.component(command.target_id, :position)
         return false unless attacker && target

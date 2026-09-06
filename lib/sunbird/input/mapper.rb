@@ -13,7 +13,7 @@ module Sunbird
         d: :move_east,
         right: :move_east,
         enter: :interact,
-        space: :interact,
+        space: :attack,
         q: :quit,
         escape: :cancel
       }.freeze
@@ -21,7 +21,6 @@ module Sunbird
       def map(physical_event)
         kind = ACTIONS[physical_event]
         return unless kind
-
         Action.new(
           kind: kind,
           state: :pressed

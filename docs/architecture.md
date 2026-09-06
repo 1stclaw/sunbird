@@ -4,7 +4,7 @@ This document describes the architecture on `v0.4-next` after the common-foundat
 
 ## Design objective
 
-v0.4 removes transitional compatibility abstractions and establishes a small runtime vocabulary that can support both the primary JRPG-oriented line and the later `v0.4-solo` action-RPG line.
+v0.4 removes transitional compatibility abstractions and establishes a small runtime vocabulary shared by the primary JRPG-oriented line and this `v0.4-solo` action-RPG branch. The solo branch now diverges at gameplay policy while preserving the shared runtime substrate.
 
 The main lifetime split is:
 
@@ -15,7 +15,7 @@ Session                       Level                        Simulation
 └── Characters                ├── Terrain                  ├── World
     └── Character             ├── Spawns                   ├── bindings
                               ├── Entries                  ├── Executor
-Party (optional)              └── Relations                └── step number
+                              └── Relations                └── step number
 ```
 
 ## World
@@ -156,7 +156,7 @@ Simulation owns the mapping between persistent Character keys and runtime Entity
 
 The relationship exists in one place: `Simulation::Bindings`.
 
-There is no `ActorRef` component and no separate `ActorBindings` object owned by Exploration.
+There is no `ActorRef` component and no separate binding object owned by a gameplay Mode.
 
 Bindings never live in Session because EntityIds are local to a running Simulation.
 
@@ -239,32 +239,29 @@ It is outside Simulation ownership because it contains gameplay policy:
 - pathfinding decisions;
 - adjacent NPC attack intent.
 
-This makes the shared runtime usable by a later solo branch with a different control/scheduling policy.
+This keeps turn-specific policy outside Simulation. On `v0.4-solo`, TurnPlanner is now only a temporary discrete controller for movement and NPC behavior; the later fixed-step scheduler can replace it without changing World or Executor.
 
-The chase path now reads `Component::Combatant#attack` instead of hardcoding damage `1`, so exploration and BattleMode use the same authored attack value.
+The chase path reads `Component::Combatant#attack` instead of hardcoding damage `1`, so direct play combat and NPC attacks use authored attack values.
 
 ## Modes
 
 Modes reference Simulation directly rather than delegating runtime access through a parent mode.
 
 ```text
-Exploration
+Play
 ├── Simulation
 ├── Session
-├── TurnPlanner
+├── player Character key
+├── TurnPlanner (temporary discrete policy)
 └── Dialogue catalog
 
 Dialogue
 └── Simulation
-
-Battle
-├── Simulation
-├── Session
-├── player Character key
-└── enemy EntityId
 ```
 
-The ModeStack still owns push/pop transitions. A pushed mode does not need an object-level pointer back to the previous mode merely to access Level/World/step state.
+`Play` handles movement, direct adjacent attacks, and interaction in the same World. There is no pushed Battle mode on `v0.4-solo`: Space attacks and Enter interacts. The first solo milestone remains input-stepped so gameplay-policy divergence can be tested before real-time scheduling is introduced.
+
+The ModeStack still owns push/pop transitions for modal contexts such as Dialogue.
 
 ## Rendering
 
@@ -305,17 +302,7 @@ Render::Scene
 Host/Input foundations
 ```
 
-Primary JRPG line:
-
-```text
-Party
-TurnPlanner
-Exploration
-Dialogue
-Battle
-```
-
-Future `v0.4-solo` line can reuse the shared substrate while replacing the turn/mode policy with direct action/realtime systems.
+The primary JRPG line can continue to own Party/Exploration/Battle policy independently. `v0.4-solo` now uses `Play` with direct map combat and no Party or Battle mode. Real-time scheduling, held-key input, action timing, and continuous spatial representation remain later solo milestones.
 
 ## Deliberately deferred
 

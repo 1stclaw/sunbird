@@ -30,7 +30,7 @@ module Sunbird
       def level = simulation.level
       def world_view = simulation.world_view
       def step_number = simulation.step_number
-      def status_text = "#{current_line}  [Enter/Space]"
+      def status_text = "#{current_line}  [Enter]"
     end
   end
 end
