@@ -2,135 +2,109 @@
 
 module Sunbird
   class Session
-    Vitals = Data.define(
-      :hp,
-      :max_hp,
-      :mp,
-      :max_mp
-    )
-
     attr_reader :party
 
-    def initialize(party:, vitals:)
+    def initialize(characters:, party: nil)
+      @characters = normalize_characters(characters)
       @party = party
-      @vitals = normalize_vitals(vitals)
-      validate_party_vitals!
+      validate_party_characters! if party
     end
 
-    def vitals(member)
-      @vitals.fetch(normalize_member(member))
+    def character(character_key)
+      @characters.fetch(normalize_key(character_key))
     end
 
-    def damage(member, amount)
+    def character_keys
+      @characters.keys.freeze
+    end
+
+    def apply_effect(effect)
+      case effect
+      in Effect::DamageCharacter
+        damage_character(effect.character_key, effect.amount)
+      else
+        raise ArgumentError,
+          "unsupported persistent effect: #{effect.inspect}"
+      end
+    end
+
+    def apply_effects(effects)
+      effects.each { |effect| validate_effect!(effect) }
+      effects.each { |effect| apply_effect(effect) }
+    end
+
+    def damage_character(character_key, amount)
       validate_amount!(amount)
-
-      current = vitals(member)
-      replace_vitals(
-        member,
-        hp: [current.hp - amount, 0].max,
-        mp: current.mp
+      current = character(character_key)
+      replace_character(
+        character_key,
+        current.replace(hp: [current.hp - amount, 0].max)
       )
     end
 
-    def heal(member, amount)
+    def heal_character(character_key, amount)
       validate_amount!(amount)
-
-      current = vitals(member)
-      replace_vitals(
-        member,
-        hp: [current.hp + amount, current.max_hp].min,
-        mp: current.mp
+      current = character(character_key)
+      replace_character(
+        character_key,
+        current.replace(hp: [current.hp + amount, current.max_hp].min)
       )
     end
 
-    def spend_mp(member, amount)
+    def spend_mp(character_key, amount)
       validate_amount!(amount)
-
-      current = vitals(member)
+      current = character(character_key)
       return false if amount > current.mp
 
-      replace_vitals(
-        member,
-        hp: current.hp,
-        mp: current.mp - amount
+      replace_character(
+        character_key,
+        current.replace(mp: current.mp - amount)
       )
       true
     end
 
-    def restore_mp(member, amount)
+    def restore_mp(character_key, amount)
       validate_amount!(amount)
-
-      current = vitals(member)
-      replace_vitals(
-        member,
-        hp: current.hp,
-        mp: [current.mp + amount, current.max_mp].min
+      current = character(character_key)
+      replace_character(
+        character_key,
+        current.replace(mp: [current.mp + amount, current.max_mp].min)
       )
     end
 
     private
 
-    def normalize_vitals(vitals)
-      unless vitals.is_a?(Hash)
-        raise ArgumentError, "session vitals must be a Hash"
+    def normalize_characters(characters)
+      unless characters.is_a?(Hash)
+        raise ArgumentError, "session characters must be a Hash"
       end
 
-      vitals.to_h do |member, value|
-        normalized_member = normalize_member(member)
-        validate_vitals!(normalized_member, value)
-        [normalized_member, value]
-      end
-    end
-
-    def validate_party_vitals!
-      missing = party.members.reject { |member| @vitals.key?(member) }
-      unless missing.empty?
-        raise ArgumentError,
-          "missing session vitals for: #{missing.inspect}"
-      end
-
-      unknown = @vitals.keys.reject { |member| party.include?(member) }
-      unless unknown.empty?
-        raise ArgumentError,
-          "session vitals contain non-party members: #{unknown.inspect}"
+      characters.each_with_object({}) do |(key, value), result|
+        normalized = normalize_key(key)
+        raise ArgumentError, "duplicate character: #{normalized.inspect}" if result.key?(normalized)
+        unless value.is_a?(Character)
+          raise ArgumentError, "invalid character for #{normalized.inspect}: #{value.inspect}"
+        end
+        result[normalized] = value
       end
     end
 
-    def validate_vitals!(member, value)
-      unless value.is_a?(Vitals)
-        raise ArgumentError,
-          "invalid vitals for #{member.inspect}: #{value.inspect}"
-      end
+    def validate_party_characters!
+      missing = party.members.reject { |member| @characters.key?(member) }
+      return if missing.empty?
 
-      values = [
-        value.hp,
-        value.max_hp,
-        value.mp,
-        value.max_mp
-      ]
-      unless values.all? { |number| number.is_a?(Integer) }
-        raise ArgumentError,
-          "vitals must use integer values for #{member.inspect}"
-      end
+      raise ArgumentError,
+        "missing characters for party members: #{missing.inspect}"
+    end
 
-      unless value.max_hp.positive?
+    def validate_effect!(effect)
+      case effect
+      in Effect::DamageCharacter
+        character(effect.character_key)
+        validate_amount!(effect.amount)
+      else
         raise ArgumentError,
-          "max_hp must be positive for #{member.inspect}"
-      end
-
-      if value.max_mp.negative?
-        raise ArgumentError,
-          "max_mp must not be negative for #{member.inspect}"
-      end
-
-      unless value.hp.between?(0, value.max_hp)
-        raise ArgumentError,
-          "hp is outside 0..max_hp for #{member.inspect}"
-      end
-
-      unless value.mp.between?(0, value.max_mp)
-        raise ArgumentError,
-          "mp is outside 0..max_mp for #{member.inspect}"
+          "unsupported persistent effect: #{effect.inspect}"
       end
     end
 
@@ -138,25 +112,15 @@ module Sunbird
       return if amount.is_a?(Integer) && amount >= 0
 
       raise ArgumentError,
-        "vital change amount must be a non-negative Integer"
+        "character state change amount must be a non-negative Integer"
     end
 
-    def normalize_member(member)
-      member.to_sym
+    def normalize_key(key)
+      key.to_sym
     end
 
-    def replace_vitals(member, hp:, mp:)
-      key = normalize_member(member)
-      current = vitals(key)
-
-      replacement = Vitals.new(
-        hp: hp,
-        max_hp: current.max_hp,
-        mp: mp,
-        max_mp: current.max_mp
-      )
-      validate_vitals!(key, replacement)
-      @vitals[key] = replacement
+    def replace_character(character_key, replacement)
+      @characters[normalize_key(character_key)] = replacement
       replacement
     end
   end

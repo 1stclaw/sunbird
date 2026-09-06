@@ -3,14 +3,12 @@
 module Sunbird
   module Mode
     class Dialogue
-      attr_reader :parent_mode, :lines, :index
+      attr_reader :simulation, :lines, :index
 
-      def initialize(parent_mode:, lines:)
-        if lines.empty?
-          raise ArgumentError, "dialogue mode requires at least one line"
-        end
+      def initialize(simulation:, lines:)
+        raise ArgumentError, "dialogue mode requires at least one line" if lines.empty?
 
-        @parent_mode = parent_mode
+        @simulation = simulation
         @lines = lines.dup.freeze
         @index = 0
       end
@@ -28,25 +26,11 @@ module Sunbird
         end
       end
 
-      def current_line
-        lines.fetch(index)
-      end
-
-      def level
-        parent_mode.level
-      end
-
-      def world_view
-        parent_mode.world_view
-      end
-
-      def step_number
-        parent_mode.step_number
-      end
-
-      def status_text
-        "#{current_line}  [Enter/Space]"
-      end
+      def current_line = lines.fetch(index)
+      def level = simulation.level
+      def world_view = simulation.world_view
+      def step_number = simulation.step_number
+      def status_text = "#{current_line}  [Enter/Space]"
     end
   end
 end

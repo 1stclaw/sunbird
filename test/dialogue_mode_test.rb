@@ -6,8 +6,13 @@ class DialogueModeTest < Minitest::Test
   include SunbirdTestSupport
 
   def setup
+    level = level_with(spawns: [])
+    simulation = Sunbird::Simulation.new(
+      level: level,
+      prototypes: prototype_catalog
+    )
     @mode = Sunbird::Mode::Dialogue.new(
-      parent_mode: nil,
+      simulation: simulation,
       lines: ["First.", "Second."]
     )
   end

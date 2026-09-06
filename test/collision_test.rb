@@ -5,37 +5,31 @@ require_relative "test_helper"
 class CollisionTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_blocking_instance_prevents_controlled_movement
+  def test_blocking_entity_prevents_controlled_movement
     level = level_with(
       spawns: [
         Sunbird::Level::Spawn.new(
-          key: :hero,
-          entity: :player,
-          x: 2,
-          y: 2
-        ),
-        Sunbird::Level::Spawn.new(
           key: :blocker,
-          entity: :goblin,
+          prototype: :goblin,
           x: 3,
           y: 2
         )
       ],
-      entry_spawn: :hero
+      entries: [default_entry(x: 2, y: 2, facing: :east)],
+      default_entry: :start
     )
+    simulation = Sunbird::Simulation.new(level: level, prototypes: prototype_catalog)
+    hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
 
-    simulation = Sunbird::Simulation.new(
+    commands = Sunbird::TurnPlanner.new.build(
+      input: move_input(:move_east),
       level: level,
-      entities: actor_catalog(goblin_behavior: :idle)
+      world: simulation.world_view,
+      controlled_id: hero_id
     )
+    simulation.step(commands: commands)
 
-    advance_simulation(simulation, move_input(:move_east))
-
-    position = simulation.world_view.component(
-      simulation.instance_id_for_spawn(:hero),
-      :position
-    )
-
+    position = simulation.world_view.component(hero_id, :position)
     assert_equal [2, 2], [position.x, position.y]
   end
 end

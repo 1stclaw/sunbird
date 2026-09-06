@@ -3,65 +3,74 @@
 module Sunbird
   class World
     def initialize
-      @next_instance_id = 0
+      @next_entity_id = 0
+      @active_entities = []
       @component_tables = {}
       @relations = Relations.new
     end
 
     def spawn(**components)
-      instance_id = @next_instance_id
-      @next_instance_id += 1
+      entity_id = @next_entity_id
+      @next_entity_id += 1
+      @active_entities[entity_id] = true
 
       components.each do |name, component|
-        set_component(instance_id, name, component)
+        set_component(entity_id, name, component)
       end
 
-      instance_id
+      entity_id
     end
 
-    def instance?(instance_id)
-      instance_id.is_a?(Integer) &&
-        instance_id >= 0 &&
-        instance_id < @next_instance_id
+    def despawn(entity_id)
+      validate_entity!(entity_id)
+
+      @component_tables.each_value do |table|
+        table.delete(entity_id)
+      end
+      @relations.remove_entity(entity_id)
+      @active_entities[entity_id] = false
+
+      entity_id
     end
 
-    def instance_ids
-      (0...@next_instance_id).to_a.freeze
+    def entity?(entity_id)
+      entity_id.is_a?(Integer) &&
+        entity_id >= 0 &&
+        entity_id < @next_entity_id &&
+        @active_entities[entity_id] == true
     end
 
-    def component(instance_id, name)
-      validate_instance!(instance_id)
-      @component_tables[name]&.[](instance_id)
+    def entity_ids
+      @active_entities.each_index.select do |entity_id|
+        @active_entities[entity_id]
+      end.freeze
     end
 
-    def set_component(instance_id, name, component)
-      validate_instance!(instance_id)
-      table_for(name)[instance_id] = component
+    def component(entity_id, name)
+      validate_entity!(entity_id)
+      @component_tables[name]&.[](entity_id)
     end
 
-    def remove_component(instance_id, name)
-      validate_instance!(instance_id)
-      @component_tables[name]&.delete(instance_id)
+    def set_component(entity_id, name, component)
+      validate_entity!(entity_id)
+      table_for(name)[entity_id] = component
+    end
+
+    def remove_component(entity_id, name)
+      validate_entity!(entity_id)
+      @component_tables[name]&.delete(entity_id)
     end
 
     def add_relation(kind:, source_id:, target_id:)
-      validate_instance!(source_id)
-      validate_instance!(target_id)
+      validate_entity!(source_id)
+      validate_entity!(target_id)
 
-      @relations.add(
-        kind: kind,
-        source_id: source_id,
-        target_id: target_id
-      )
+      @relations.add(kind: kind, source_id: source_id, target_id: target_id)
     end
 
     def relation_targets(kind:, source_id:)
-      validate_instance!(source_id)
-
-      @relations.targets(
-        kind: kind,
-        source_id: source_id
-      )
+      validate_entity!(source_id)
+      @relations.targets(kind: kind, source_id: source_id)
     end
 
     def view
@@ -74,11 +83,10 @@ module Sunbird
       @component_tables[name] ||= ComponentTable.new
     end
 
-    def validate_instance!(instance_id)
-      return if instance?(instance_id)
+    def validate_entity!(entity_id)
+      return if entity?(entity_id)
 
-      raise ArgumentError,
-        "unknown instance_id: #{instance_id.inspect}"
+      raise ArgumentError, "unknown entity_id: #{entity_id.inspect}"
     end
   end
 end

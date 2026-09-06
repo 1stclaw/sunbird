@@ -1,220 +1,274 @@
-# Sunbird v0.3d Architecture
+# Sunbird v0.4 Development Architecture
 
-Sunbird v0.3d is the final planned release of the v0.3 architecture line. It combines Kitty presentation, a level-local simulation, persistent Session/Party identity, interaction/dialogue modes, a minimal Battle mode, and the first explicit split between persistent party vitals and local runtime actor state.
+This document describes the architecture on `v0.4-next` after the common-foundation cleanup. It is intentionally different from the frozen v0.3d model.
 
-The Ruby implementation is a research/prototype engine. Its purpose is to make ownership, lifetime, and gameplay boundaries concrete enough to evaluate and later re-express—not to preserve every current class name indefinitely.
+## Design objective
 
-## Vocabulary
+v0.4 removes transitional compatibility abstractions and establishes a small runtime vocabulary that can support both the primary JRPG-oriented line and the later `v0.4-solo` action-RPG line.
 
-| Term | Meaning |
-| --- | --- |
-| `App` | executable shell connecting input, modes, rendering, and host I/O |
-| `Session` | persistent state that survives local Simulation/World lifetimes |
-| `Party` | ordered roster of stable party-member identities plus leader |
-| `Session::Vitals` | persistent HP/MP values for one party member |
-| `ModeStack` | owns the active gameplay/application context |
-| `Exploration` | binds party control, advances local simulation, and handles interaction |
-| `Dialogue` | consumes dialogue input while leaving Exploration simulation suspended |
-| `Battle` | consumes combat input and coordinates local enemy state with persistent party vitals |
-| `Simulation` | owns one loaded Level/World runtime and authoritative World command application |
-| `Level` | immutable authored description of one playable area |
-| `Terrain` | authored spatial/passability data inside a Level |
-| `Entity` | reusable authored component recipe |
-| `Spawn` | authored instruction to instantiate an Entity |
-| `InstanceId` | integer identity of one local runtime instance |
-| `World` | mutable level-local components and runtime relations |
-| `Health` | level-local HP component, currently used by enemies |
-| `Combatant` | local combat component containing attack power in v0.3d |
-| `Facing` | local cardinal interaction direction |
-| `Interactable` | local component referencing authored dialogue |
-| `Planner` | optional read-only command producer used by Exploration simulation |
-| `Resolver` | authoritative validator/applier for World commands |
-| `Scene` | backend-neutral presentation snapshot from Level + World::View |
-| `Host` | terminal/platform I/O boundary |
-
-## Lifetime domains
-
-The most important v0.3d distinction is lifetime.
+The main lifetime split is:
 
 ```text
-persistent
-────────────────────────────────────
-Session
-├── Party
-└── Vitals
-    ├── :hero
-    └── :mage
+persistent                    authored                     runtime
+──────────────────            ──────────────────           ──────────────────
+Session                       Level                        Simulation
+└── Characters                ├── Terrain                  ├── World
+    └── Character             ├── Spawns                   ├── bindings
+                              ├── Entries                  ├── Executor
+Party (optional)              └── Relations                └── step number
+```
 
-authored / immutable
-────────────────────────────────────
+## World
+
+`World` is the canonical mutable runtime container.
+
+It owns:
+
+- integer EntityIds;
+- component tables;
+- runtime relations;
+- a read-only `World::View`.
+
+It does not own persistent Character state.
+
+The old v0.4 experimental `AreaState` name has been removed rather than kept as a compatibility alias. v0.3d already preserves the historical API.
+
+## Components
+
+Component schemas are independent of World storage and live under `Component`:
+
+```text
+Component::PrototypeRef
+Component::Position
+Component::Health
+Component::Renderable
+Component::Behavior
+Component::Collision
+Component::Facing
+Component::Interactable
+Component::Combatant
+```
+
+This prevents component type names from changing when the storage container is renamed or reorganized.
+
+## Prototype and EntityId
+
+`Prototype` is an authored reusable component recipe.
+
+```text
+Prototype :goblin
+├── Health
+├── Renderable
+├── Behavior
+├── Collision
+└── Combatant
+```
+
+A runtime entity is identified only by an integer EntityId.
+
+```text
+Prototype
+   |
+   | instantiate
+   v
+World EntityId
+```
+
+The earlier authored `Entity` name was removed because it conflicted with common ECS/game-engine terminology, where an entity normally means a runtime object/identity.
+
+`Prototype::Catalog` and `Prototype::Loader` replace the old Entity catalog/loader.
+
+## Level
+
+A Level is immutable authored structure:
+
+```text
 Level
 ├── Terrain
-├── Spawns
-└── static Relations
-
-level-local / mutable
-────────────────────────────────────
-World
-├── runtime instances
-├── positions
-├── facing
-├── collision
-├── behavior
-├── local Health
-├── Combatant
-└── runtime Relations
+├── Spawn
+├── Entry
+└── Relation
 ```
 
-`Session` never stores World `InstanceId`s. Stable party identity such as `:hero` is distinct from the runtime instance used to represent that actor inside one loaded Level.
-
-## Persistent party vitals
-
-v0.3d makes party HP/MP authoritative in Session:
+A `Spawn` contains:
 
 ```text
-:hero
-  ↓
-Session::Vitals
-  hp
-  max_hp
-  mp
-  max_mp
+key
+prototype
+x
+y
 ```
 
-The player Entity recipe no longer supplies `World::Health`.
+An `Entry` contains:
 
-Therefore `Session#vitals(:hero)` is the one authoritative player HP/MP value, while `World#component(player_id, :health)` is intentionally absent.
+```text
+key
+x
+y
+facing
+```
 
-Session validates that every party member has vitals, clamps healing/damage, prevents invalid MP spending, and stores replacement immutable Vitals values.
+Entries are authored reference points for persistent characters entering the Level. The player is no longer represented by a static Level spawn.
 
-This is deliberately **not yet a complete persistent actor model**. Player attack remains in the local `Combatant` component. That asymmetry is one of the explicit inputs to the v0.4 redesign.
+Relations can reference either spawn keys or entry keys. Simulation resolves them when both endpoints have runtime EntityIds. This allows a relation such as a goblin targeting `:start` to resolve after the persistent player Character is spawned into that entry.
 
-## Level and World
+## Session and Character
 
-`Level` is immutable authored area data. Instantiating a Level creates local World instances and resolves authored spawn-key relations into runtime `InstanceId` relations.
+Session is the persistent game-lifetime root.
 
-`World` remains level-local. Enemy HP, movement, behavior, collision, pathfinding context, and runtime relations belong there.
+The current persistent RPG value is intentionally flat:
 
-The name `World` is now recognized as potentially confusing for a JRPG that may also have an overworld/world map. v0.3d intentionally leaves the name unchanged; v0.4 will reconsider it.
+```text
+Character
+├── hp
+├── max_hp
+├── mp
+├── max_mp
+└── attack
+```
+
+This replaces the temporary hierarchy:
+
+```text
+ActorState
+├── Vitals
+└── Stats
+```
+
+The hierarchy can be reintroduced later if real systems justify separate stat/vital objects.
+
+Session owns Characters by stable key:
+
+```text
+:hero -> Character
+:mage -> Character
+```
+
+`Party` remains optional gameplay policy and only references stable Character keys.
+
+## Simulation bindings
+
+Simulation owns the mapping between persistent Character keys and runtime EntityIds.
+
+```text
+:hero <-> EntityId 7
+```
+
+The relationship exists in one place: `Simulation::Bindings`.
+
+There is no `ActorRef` component and no separate `ActorBindings` object owned by Exploration.
+
+Bindings never live in Session because EntityIds are local to a running Simulation.
 
 ## Simulation
 
-The core API remains:
+Simulation owns the currently running Level state:
 
 ```text
-Simulation#plan(input:, controlled_id:)
-Simulation#step(commands:)
+Simulation
+├── Level
+├── World
+├── Bindings
+├── Executor
+└── step_number
 ```
 
-`plan` asks Planner to derive command intent from read-only state. It does not mutate World.
+It does **not** own the turn planner.
 
-`step` gives explicit commands to Resolver and increments `step_number`.
-
-A **step is a state transition, not a clock tick**.
-
-Modes choose when a step occurs. Dialogue does not step the simulation. Exploration normally does. Battle calls `Simulation#step` when a player combat turn applies World commands.
-
-## Commands and Resolver
-
-v0.3d World commands are:
+Its primary mutation API is:
 
 ```text
-Move(instance_id, dx, dy)
-Attack(attacker_id, target_id, damage)
-Defeat(instance_id)
+Simulation#step(commands:) -> StepResult
 ```
 
-The rule remains:
+`StepResult` contains:
 
 ```text
-command producer = proposed World intent
-Resolver         = authoritative World mutation
+number
+persistent effects
 ```
 
-`Move` validates traversability and updates Facing even if movement is blocked.
+This removes the v0.3-compatible convention where `step` returned the step number while yielding effects through a block.
 
-`Attack` validates local attacker/target instances and adjacency, then reduces target `World::Health`.
+## Commands::Buffer
 
-`Defeat` only retires an instance whose World Health is already zero. It removes behavior, collision, rendering, combat, and interactability while leaving identity, position, and zero Health available as local historical state.
+`Simulation::Commands::Buffer` is deliberately retained.
 
-## Modes and transitions
+```text
+Commands::Buffer
+├── Move
+├── Attack
+└── Defeat
+```
 
-`App` owns actual ModeStack mutation. Modes return transition intent.
+The Buffer remains the explicit batch boundary between command production and execution. This is useful for later scheduling, inspection, recording, validation, Rust porting, or command batching even though the current implementation wraps a frozen Ruby Array.
+
+The v0.4 cleanup therefore does **not** replace it with a plain array.
+
+## Executor
+
+`Simulation::Executor` replaces `Simulation::Resolver`.
+
+Executor:
+
+- receives a Commands::Buffer;
+- checks command legality that belongs to runtime execution;
+- mutates World;
+- emits persistent Effect values when a command targets a bound Character.
+
+Current examples:
+
+```text
+Attack local goblin
+  -> mutate Component::Health in World
+
+Attack bound player entity
+  -> Effect::DamageCharacter(:hero, amount)
+```
+
+The term Executor better matches the current behavior: attack damage is already supplied by the command producer, so this object is not yet a general gameplay-rules resolver.
+
+## TurnPlanner
+
+The current turn-oriented command producer is `TurnPlanner`.
+
+It is outside Simulation ownership because it contains gameplay policy:
+
+- controlled movement from abstract input;
+- idle/wander/chase behavior;
+- pathfinding decisions;
+- adjacent NPC attack intent.
+
+This makes the shared runtime usable by a later solo branch with a different control/scheduling policy.
+
+The chase path now reads `Component::Combatant#attack` instead of hardcoding damage `1`, so exploration and BattleMode use the same authored attack value.
+
+## Modes
+
+Modes reference Simulation directly rather than delegating runtime access through a parent mode.
 
 ```text
 Exploration
-   |
-   +-- interact with Interactable
-   |        ↓
-   |   Push(Dialogue)
-   |
-   `-- interact with adjacent Combatant
-            ↓
-        Push(Battle)
-```
+├── Simulation
+├── Session
+├── TurnPlanner
+└── Dialogue catalog
 
-Dialogue consumes Enter/Space, Escape, and Quit without advancing Simulation.
+Dialogue
+└── Simulation
 
-Battle consumes Enter/Space for turns, Escape to flee, and Quit to exit. Both Dialogue and Battle expose the suspended Exploration Level/World view so the same underlying Scene remains visible.
-
-## Battle ownership
-
-Battle is intentionally small.
-
-The player's attack is expressed as a normal World `Attack` command and optional `Defeat` command:
-
-```text
 Battle
-  ↓
-Simulation#step
-  ↓
-Resolver
-  ↓
-enemy World::Health
+├── Simulation
+├── Session
+├── player Character key
+└── enemy EntityId
 ```
 
-Enemy retaliation currently uses the persistent lifetime domain:
+The ModeStack still owns push/pop transitions. A pushed mode does not need an object-level pointer back to the previous mode merely to access Level/World/step state.
 
-```text
-enemy Combatant.attack
-        ↓
-Battle
-        ↓
-Session#damage(:hero, amount)
-        ↓
-persistent party HP
-```
+## Rendering
 
-v0.3d therefore has two mutation authorities for two different kinds of state:
-
-```text
-Resolver → local World state
-Session  → persistent party vitals
-```
-
-There is no duplicated party HP between them.
-
-However, Battle itself currently knows how to route effects to both domains. A future unified gameplay-effect boundary is deliberately deferred to v0.4.
-
-## Interaction and dialogue
-
-Facing uses four cardinal directions: `:north`, `:south`, `:east`, and `:west`.
-
-Resolver updates Facing before movement legality is resolved, so pressing toward a blocking NPC or enemy still turns the controlled actor toward it.
-
-Exploration checks the adjacent cell in the Facing direction. Interaction priority is:
-
-```text
-Interactable → Dialogue
-Combatant    → Battle
-otherwise    → no interaction transition
-```
-
-Dialogue content remains a small authored mapping from `dialogue_key` to ordered lines. No branching, conditions, scripting, or persistent dialogue flags exist yet.
-
-## Presentation
-
-Projection remains backend-neutral:
+Projection consumes canonical runtime terminology:
 
 ```text
 Level + World::View
@@ -224,79 +278,53 @@ Render::Projector
         |
         v
 Render::Scene
-        |
-        v
-Render::Kitty
-        |
-        v
-Host::Terminal
+├── Tile
+└── Entity(entity_id, ...)
 ```
 
-The current Scene contains terrain and runtime instances with semantic render keys, positions, layers, fallback glyphs, and stable instance IDs.
+Kitty remains the active runtime renderer. ASCII and the current selector are left in place during this refactor because renderer replacement is independent from state/runtime cleanup.
 
-Dialogue and Battle UI text still uses the terminal status row. There is no generic UI-overlay scene model yet.
+## Shared versus branch-specific
 
-`Render::Ascii` remains inactive legacy/reference code. v0.3d requires Kitty graphics support at runtime.
-
-## Host and input
-
-`Host::Terminal` owns alternate-screen lifecycle, synchronized output, and persistent raw terminal input mode.
-
-The terminal decoder supports WASD, arrows, Enter, Space, Escape, Q, and Ctrl-C. The mapper converts these into movement, interact, cancel, and quit actions, and Modes interpret them contextually.
-
-Enhanced Kitty keyboard press/repeat/release reporting remains deliberately out of scope.
-
-## Content
-
-Temporary Ruby-authored content remains under:
+Shared v0.4 substrate:
 
 ```text
-content/entities/
-content/levels/
-content/dialogue/
+Session
+Character
+Level
+Prototype
+World
+EntityId
+Components
+Simulation
+Bindings
+Commands::Buffer
+Executor
+Effects
+Render::Scene
+Host/Input foundations
 ```
 
-Loaders reuse `Content::RubySource`. This is prototype scaffolding, not a commitment to Ruby source as the long-term content/persistence format.
+Primary JRPG line:
 
-## v0.3d architectural boundary
+```text
+Party
+TurnPlanner
+Exploration
+Dialogue
+Battle
+```
 
-The v0.3 line now proves:
+Future `v0.4-solo` line can reuse the shared substrate while replacing the turn/mode policy with direct action/realtime systems.
 
-- authored Level versus mutable local runtime state;
-- stable party identity versus runtime InstanceId;
-- persistent Session state versus local World state;
-- mode-owned advancement policy;
-- Exploration, Dialogue, and Battle contexts;
-- explicit World command/Resolver authority;
-- persistent party HP/MP without a mirrored World Health component;
-- visible encounter entry, flee, victory, and local enemy retirement;
-- backend-neutral Scene projection with Kitty presentation.
+## Deliberately deferred
 
-Known tensions intentionally left for v0.4:
-
-- `World` naming versus a future overworld/world-map concept;
-- Session as a growing persistent-state root;
-- lack of a general persistent `ActorState`;
-- player attack still stored in local `Combatant`;
-- Battle directly coordinating Session and World mutation domains;
-- no unified effect/resolution layer spanning both lifetimes;
-- no explicit reusable binding object from stable actor identity to local runtime instance.
-
-See [`v0.4-state-model-proposal.md`](v0.4-state-model-proposal.md).
-
-## Deferred gameplay and presentation systems
-
-Not part of v0.3d:
-
+- general Intent -> Rules -> Effects architecture;
+- realtime/fixed-step scheduling;
+- weapons/projectiles;
 - inventory/equipment;
-- spells, skills, and actual MP use;
-- party-wide battle participation;
-- battle menus or target selection;
 - save serialization;
-- branching dialogue and quests;
-- persistent NPC/world-change state;
-- general UI overlay system;
-- camera/viewport;
-- interpolation/animation;
-- Raylib integration;
-- fixed-step realtime scheduling.
+- persistent map changes;
+- Raylib;
+- Lua;
+- generic ECS System/Manager abstractions.

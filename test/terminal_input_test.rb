@@ -4,54 +4,98 @@ require "stringio"
 require_relative "test_helper"
 
 class TerminalInputTest < Minitest::Test
-  def test_reads_letter_keys
-    assert_equal :w, read("w")
-    assert_equal :a, read("A")
-    assert_equal :q, read("q")
+  def test_reads_legacy_letter_keys
+    assert_equal :w, read_legacy("w")
+    assert_equal :a, read_legacy("A")
+    assert_equal :q, read_legacy("q")
   end
 
-  def test_reads_interaction_keys
-    assert_equal :enter, read("\r")
-    assert_equal :enter, read("\n")
-    assert_equal :space, read(" ")
+  def test_reads_legacy_interaction_and_arrow_keys
+    assert_equal :enter, read_legacy("\r")
+    assert_equal :space, read_legacy(" ")
+    assert_equal :up, read_legacy("\e[A")
+    assert_equal :left, read_legacy("\e[1;5D")
   end
 
-  def test_reads_legacy_arrow_keys
-    assert_equal :up, read("\e[A")
-    assert_equal :down, read("\e[B")
-    assert_equal :right, read("\e[C")
-    assert_equal :left, read("\e[D")
+  def test_reads_bare_escape_and_ctrl_c_in_legacy_mode
+    assert_equal :escape, read_legacy("\e")
+    assert_equal :q, read_legacy("\u0003")
   end
 
-  def test_reads_modified_csi_arrow_keys
-    assert_equal :up, read("\e[1;2A")
-    assert_equal :left, read("\e[1;5D")
+  def test_kitty_polling_reports_press_repeat_and_release
+    events = poll_kitty(
+      "\e[119;1:1u" \
+      "\e[119;1:2u" \
+      "\e[119;1:3u"
+    )
+
+    assert_equal 3, events.length
+    assert_event :w, :pressed, events[0]
+    assert_event :w, :repeat, events[1]
+    assert_event :w, :released, events[2]
   end
 
-  def test_reads_ss3_arrow_keys
-    assert_equal :up, read("\eOA")
-    assert_equal :right, read("\eOC")
+  def test_kitty_polling_reports_space_enter_escape_and_arrows
+    events = poll_kitty(
+      "\e[32;1:1u" \
+      "\e[13;1:1u" \
+      "\e[27;1:1u" \
+      "\e[A" \
+      "\e[1;1:3A"
+    )
+
+    assert_event :space, :pressed, events[0]
+    assert_event :enter, :pressed, events[1]
+    assert_event :escape, :pressed, events[2]
+    assert_event :up, :pressed, events[3]
+    assert_event :up, :released, events[4]
   end
 
-  def test_bare_escape_is_a_real_event
-    assert_equal :escape, read("\e")
+  def test_kitty_ctrl_c_maps_to_quit
+    event = poll_kitty("\e[99;5:1u").fetch(0)
+    assert_event :q, :pressed, event
   end
 
-  def test_ctrl_c_maps_to_quit_event_in_raw_mode
-    assert_equal :q, read("\u0003")
+  def test_unknown_kitty_key_is_ignored
+    assert_empty poll_kitty("\e[120;1:1u")
   end
 
-  def test_unknown_escape_sequence_is_ignored
-    assert_nil read("\e[15~")
+  def test_blocking_kitty_compatibility_returns_only_pressed_key
+    input = StringIO.new(
+      "\e[119;1:2u" \
+      "\e[119;1:3u" \
+      "\e[100;1:1u"
+    )
+    adapter = Sunbird::Host::TerminalInput.new(
+      input: input,
+      keyboard_protocol: :kitty
+    )
+
+    assert_equal :d, adapter.read_event
   end
 
   private
 
-  def read(bytes)
+  def read_legacy(bytes)
     input = StringIO.new(bytes)
     Sunbird::Host::TerminalInput.new(
       input: input,
+      keyboard_protocol: :legacy,
       escape_timeout: 0
     ).read_event
+  end
+
+  def poll_kitty(bytes)
+    input = StringIO.new(bytes)
+    Sunbird::Host::TerminalInput.new(
+      input: input,
+      keyboard_protocol: :kitty
+    ).poll_events
+  end
+
+  def assert_event(key, state, event)
+    assert_instance_of Sunbird::Host::KeyEvent, event
+    assert_equal key, event.key
+    assert_equal state, event.state
   end
 end

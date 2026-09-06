@@ -6,25 +6,18 @@ module Sunbird
       def traversable?(level:, world:, x:, y:, except_id: nil)
         return false unless level.passable?(x, y)
 
-        !occupied?(
-          world: world,
-          x: x,
-          y: y,
-          except_id: except_id
-        )
+        !occupied?(world: world, x: x, y: y, except_id: except_id)
       end
 
       def occupied?(world:, x:, y:, except_id: nil)
-        world.instance_ids.any? do |instance_id|
-          next false if instance_id == except_id
+        world.entity_ids.any? do |entity_id|
+          next false if entity_id == except_id
 
-          collision = world.component(instance_id, :collision)
+          collision = world.component(entity_id, :collision)
           next false unless collision&.blocks_movement
 
-          position = world.component(instance_id, :position)
-          next false unless position
-
-          position.x == x && position.y == y
+          position = world.component(entity_id, :position)
+          position && position.x == x && position.y == y
         end
       end
     end

@@ -14,9 +14,21 @@ class InputMapperTest < Minitest::Test
     assert_equal :pressed, action.state
   end
 
-  def test_enter_and_space_map_to_interact
+  def test_enter_and_space_still_map_to_interact
     assert_equal :interact, @mapper.map(:enter).kind
     assert_equal :interact, @mapper.map(:space).kind
+  end
+
+  def test_mapper_preserves_key_event_state
+    physical = Sunbird::Host::KeyEvent.new(
+      key: :w,
+      state: :released
+    )
+
+    action = @mapper.map(physical)
+
+    assert_equal :move_north, action.kind
+    assert_equal :released, action.state
   end
 
   def test_q_still_maps_to_quit

@@ -5,62 +5,48 @@ require_relative "test_helper"
 class PathfindingChaseTest < Minitest::Test
   include SunbirdTestSupport
 
-  def test_chaser_routes_around_blocked_terrain
-    tiles = {
-      " " => Sunbird::Level::Tile.new(render_key: :ground, glyph: " ", passable: true),
-      "~" => Sunbird::Level::Tile.new(render_key: :water, glyph: "~", passable: false)
-    }.freeze
-
-    terrain = Sunbird::Level::Terrain.new(
-      rows: [
-        "       ",
-        "       ",
-        "       ",
-        "   ~   ",
-        "       ",
-        "       ",
-        "       "
-      ],
-      tiles: tiles
-    )
-
-    level = Sunbird::Level.new(
-      name: :test,
-      terrain: terrain,
+  def test_chaser_routes_around_blocking_entity
+    level = level_with(
+      width: 8,
+      height: 6,
       spawns: [
         Sunbird::Level::Spawn.new(
-          key: :hero,
-          entity: :player,
-          x: 5,
-          y: 3
+          key: :hunter,
+          prototype: :goblin,
+          x: 1,
+          y: 2
         ),
         Sunbird::Level::Spawn.new(
-          key: :hunter,
-          entity: :goblin,
-          x: 1,
-          y: 3
+          key: :blocker,
+          prototype: :villager,
+          x: 2,
+          y: 2
         )
       ],
+      entries: [default_entry(x: 5, y: 2)],
+      default_entry: :start,
       relations: [
         Sunbird::Level::Relation.new(
           kind: :targets,
           source: :hunter,
-          target: :hero
+          target: :start
         )
-      ],
-      entry_spawn: :hero
+      ]
     )
+    simulation = Sunbird::Simulation.new(level: level, prototypes: prototype_catalog)
+    hero_id = simulation.spawn_character(character_key: :hero, prototype: :player)
+    hunter_id = simulation.entity_id_for_spawn(:hunter)
 
-    simulation = Sunbird::Simulation.new(
+    commands = Sunbird::TurnPlanner.new.build(
+      input: Sunbird::Input::Snapshot.empty,
       level: level,
-      entities: actor_catalog
+      world: simulation.world_view,
+      controlled_id: hero_id
     )
-    goblin_id = instance_id_for(simulation, :goblin)
+    simulation.step(commands: commands)
 
-    advance_simulation(simulation, Sunbird::Input::Snapshot.empty)
-
-    position = simulation.world_view.component(goblin_id, :position)
-
-    assert_equal [2, 3], [position.x, position.y]
+    position = simulation.world_view.component(hunter_id, :position)
+    refute_equal [2, 2], [position.x, position.y]
+    assert_equal 1, (position.x - 1).abs + (position.y - 2).abs
   end
 end

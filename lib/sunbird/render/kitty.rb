@@ -74,16 +74,16 @@ module Sunbird
           )
         end
 
-        scene.instances.sort_by(&:layer).each do |instance|
+        scene.entities.sort_by(&:layer).each do |entity|
           collect_item(
             desired_placements,
             desired_fallbacks,
-            key: [:instance, instance.instance_id],
-            x: instance.x,
-            y: instance.y,
-            render_key: instance.render_key,
-            fallback_glyph: instance.fallback_glyph,
-            z: instance.layer
+            key: [:entity, entity.entity_id],
+            x: entity.x,
+            y: entity.y,
+            render_key: entity.render_key,
+            fallback_glyph: entity.fallback_glyph,
+            z: entity.layer
           )
         end
 
@@ -196,7 +196,7 @@ module Sunbird
 
       def upload_scene_assets(scene, output)
         render_keys = scene.tiles.map(&:render_key) +
-          scene.instances.map(&:render_key)
+          scene.entities.map(&:render_key)
 
         render_keys.uniq.each do |render_key|
           asset = @assets[render_key]

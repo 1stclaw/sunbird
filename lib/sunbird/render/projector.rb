@@ -8,7 +8,7 @@ module Sunbird
           width: level.width,
           height: level.height,
           tiles: project_tiles(level),
-          instances: project_instances(level, world)
+          entities: project_entities(level, world)
         )
       end
 
@@ -27,19 +27,12 @@ module Sunbird
         end.flatten.freeze
       end
 
-      def project_instances(level, world)
-        renderables(world).filter_map do |
-          instance_id,
-          position,
-          renderable
-        |
-          next unless level.inside?(
-            position.x,
-            position.y
-          )
+      def project_entities(level, world)
+        renderables(world).filter_map do |entity_id, position, renderable|
+          next unless level.inside?(position.x, position.y)
 
-          Scene::Instance.new(
-            instance_id: instance_id,
+          Scene::Entity.new(
+            entity_id: entity_id,
             x: position.x,
             y: position.y,
             render_key: renderable.render_key,
@@ -50,31 +43,13 @@ module Sunbird
       end
 
       def renderables(world)
-        world.instance_ids.filter_map do |instance_id|
-          position = world.component(
-            instance_id,
-            :position
-          )
-
-          renderable = world.component(
-            instance_id,
-            :renderable
-          )
-
+        world.entity_ids.filter_map do |entity_id|
+          position = world.component(entity_id, :position)
+          renderable = world.component(entity_id, :renderable)
           next unless position && renderable
 
-          [
-            instance_id,
-            position,
-            renderable
-          ]
-        end.sort_by do |
-          _instance_id,
-          _position,
-          renderable
-        |
-          renderable.layer
-        end
+          [entity_id, position, renderable]
+        end.sort_by { |_entity_id, _position, renderable| renderable.layer }
       end
     end
   end

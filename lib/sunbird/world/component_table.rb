@@ -7,27 +7,27 @@ module Sunbird
         @entries = []
       end
 
-      def [](instance_id)
-        @entries[instance_id]
+      def [](entity_id)
+        @entries[entity_id]
       end
 
-      def []=(instance_id, value)
-        validate_instance_id!(instance_id)
-        @entries[instance_id] = value
+      def []=(entity_id, value)
+        validate_entity_id!(entity_id)
+        @entries[entity_id] = value
       end
 
-      def delete(instance_id)
-        validate_instance_id!(instance_id)
-        @entries[instance_id] = nil
+      def delete(entity_id)
+        validate_entity_id!(entity_id)
+        @entries[entity_id] = nil
       end
 
       private
 
-      def validate_instance_id!(instance_id)
-        return if instance_id.is_a?(Integer) && instance_id >= 0
+      def validate_entity_id!(entity_id)
+        return if entity_id.is_a?(Integer) && entity_id >= 0
 
         raise ArgumentError,
-          "instance_id must be a non-negative Integer"
+          "entity_id must be a non-negative Integer"
       end
     end
   end

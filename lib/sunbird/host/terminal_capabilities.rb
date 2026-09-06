@@ -9,23 +9,20 @@ module Sunbird
       ].freeze
 
       def self.detect(env: ENV)
-        graphics_protocol = if kitty_graphics?(env)
-          :kitty
-        end
+        kitty = kitty_terminal?(env)
 
         Capabilities.new(
-          graphics_protocol: graphics_protocol,
-          keyboard_protocol: :legacy
+          graphics_protocol: kitty ? :kitty : nil,
+          keyboard_protocol: kitty ? :kitty : :legacy
         )
       end
 
-      def self.kitty_graphics?(env)
+      def self.kitty_terminal?(env)
         return true if present?(env["KITTY_WINDOW_ID"])
-
         term = env["TERM"].to_s.downcase
         KITTY_TERMS.any? { |name| term.include?(name) }
       end
-      private_class_method :kitty_graphics?
+      private_class_method :kitty_terminal?
 
       def self.present?(value)
         value && !value.empty?

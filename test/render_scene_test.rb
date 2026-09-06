@@ -45,9 +45,9 @@ class RenderSceneTest < Minitest::Test
           fallback_glyph: "."
         )
       ],
-      instances: [
-        Sunbird::Render::Scene::Instance.new(
-          instance_id: 7,
+      entities: [
+        Sunbird::Render::Scene::Entity.new(
+          entity_id: 7,
           x: 1,
           y: 0,
           render_key: :hero,
@@ -58,7 +58,7 @@ class RenderSceneTest < Minitest::Test
     )
 
     assert_equal ".P.\n...", Sunbird::Render::Ascii.new.render(scene)
-    assert_equal 7, scene.instances.first.instance_id
-    assert_equal :hero, scene.instances.first.render_key
+    assert_equal 7, scene.entities.first.entity_id
+    assert_equal :hero, scene.entities.first.render_key
   end
 end

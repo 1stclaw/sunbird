@@ -12,7 +12,7 @@ class TerminalCapabilitiesTest < Minitest::Test
     )
 
     assert_equal :kitty, capabilities.graphics_protocol
-    assert_equal :legacy, capabilities.keyboard_protocol
+    assert_equal :kitty, capabilities.keyboard_protocol
   end
 
   def test_detects_kitty_from_term
@@ -21,9 +21,10 @@ class TerminalCapabilitiesTest < Minitest::Test
     )
 
     assert_equal :kitty, capabilities.graphics_protocol
+    assert_equal :kitty, capabilities.keyboard_protocol
   end
 
-  def test_unknown_terminal_reports_no_graphics_protocol
+  def test_unknown_terminal_reports_legacy_keyboard_protocol
     capabilities = Sunbird::Host::TerminalCapabilities.detect(
       env: { "TERM" => "xterm-256color" }
     )

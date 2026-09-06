@@ -7,23 +7,20 @@ module Sunbird
         @world = world
       end
 
-      def instance?(instance_id)
-        @world.instance?(instance_id)
+      def entity?(entity_id)
+        @world.entity?(entity_id)
       end
 
-      def instance_ids
-        @world.instance_ids
+      def entity_ids
+        @world.entity_ids
       end
 
-      def component(instance_id, name)
-        @world.component(instance_id, name)
+      def component(entity_id, name)
+        @world.component(entity_id, name)
       end
 
       def relation_targets(kind:, source_id:)
-        @world.relation_targets(
-          kind: kind,
-          source_id: source_id
-        )
+        @world.relation_targets(kind: kind, source_id: source_id)
       end
     end
   end

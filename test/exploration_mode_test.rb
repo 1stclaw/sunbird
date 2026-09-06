@@ -9,27 +9,27 @@ class ExplorationModeTest < Minitest::Test
     level = level_with(
       spawns: [
         Sunbird::Level::Spawn.new(
-          key: :hero,
-          entity: :player,
-          x: 2,
-          y: 2
-        ),
-        Sunbird::Level::Spawn.new(
           key: :villager,
-          entity: :villager,
+          prototype: :villager,
           x: 3,
           y: 2
         )
       ],
-      entry_spawn: :hero
+      entries: [default_entry(x: 2, y: 2)],
+      default_entry: :start
     )
-    simulation = Sunbird::Simulation.new(
+
+    @simulation = Sunbird::Simulation.new(
       level: level,
-      entities: actor_catalog
+      prototypes: prototype_catalog
     )
     @session = test_session
+    @simulation.spawn_character(
+      character_key: :hero,
+      prototype: :player
+    )
     @mode = Sunbird::Mode::Exploration.new(
-      simulation: simulation,
+      simulation: @simulation,
       session: @session,
       dialogues: dialogue_catalog
     )
@@ -42,24 +42,29 @@ class ExplorationModeTest < Minitest::Test
     assert_equal 1, @mode.step_number
   end
 
-  def test_party_leader_is_bound_to_level_entry_spawn
-    hero_id = @mode.controlled_instance_id
+  def test_party_leader_binding_is_owned_by_simulation
+    hero_id = @mode.controlled_entity_id
     position = @mode.world_view.component(hero_id, :position)
 
-    assert_equal hero_id, @mode.instance_id_for_party_member(:hero)
-    assert_nil @mode.instance_id_for_party_member(:mage)
+    assert_equal hero_id, @simulation.entity_id_for_character(:hero)
+    assert_equal :hero, @simulation.character_key_for_entity(hero_id)
+    assert_nil @mode.entity_id_for_party_member(:mage)
     assert_equal [2, 2], [position.x, position.y]
   end
 
-  def test_party_leader_world_instance_does_not_own_health
-    hero_id = @mode.controlled_instance_id
+  def test_party_leader_world_entity_has_no_persistent_combat_state
+    hero_id = @mode.controlled_entity_id
 
     assert_nil @mode.world_view.component(hero_id, :health)
-    assert_equal 10, @session.vitals(:hero).hp
+    assert_nil @mode.world_view.component(hero_id, :combatant)
+
+    hero = @session.character(:hero)
+    assert_equal 10, hero.hp
+    assert_equal 2, hero.attack
   end
 
-  def test_status_uses_persistent_session_vitals
-    @session.damage(:hero, 3)
+  def test_status_uses_persistent_character
+    @session.damage_character(:hero, 3)
     @session.spend_mp(:hero, 1)
 
     assert_match "Hero HP 7/10 MP 3/4", @mode.status_text
@@ -68,7 +73,7 @@ class ExplorationModeTest < Minitest::Test
   def test_blocked_move_still_changes_facing
     @mode.advance(input: move_input(:move_east))
 
-    hero_id = @mode.controlled_instance_id
+    hero_id = @mode.controlled_entity_id
     position = @mode.world_view.component(hero_id, :position)
     facing = @mode.world_view.component(hero_id, :facing)
 
