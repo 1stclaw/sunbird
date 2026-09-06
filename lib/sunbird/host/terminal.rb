@@ -14,6 +14,13 @@ module Sunbird
       BEGIN_SYNC_UPDATE = "\e[?2026h"
       END_SYNC_UPDATE = "\e[?2026l"
 
+      # Kitty keyboard protocol flags:
+      #   0b0010 report press/repeat/release event types
+      #   0b1000 report text-producing keys as key events
+      KITTY_KEYBOARD_FLAGS = 0b1010
+      ENABLE_KITTY_KEYBOARD = "\e[>#{KITTY_KEYBOARD_FLAGS}u"
+      DISABLE_KITTY_KEYBOARD = "\e[<u"
+
       attr_reader :capabilities
 
       def initialize(
@@ -24,15 +31,33 @@ module Sunbird
       )
         @input = input
         @output = output
-        @manage_input_mode = input_adapter.nil?
-        @input_adapter = input_adapter || TerminalInput.new(input: input)
         @capabilities = TerminalCapabilities.detect(env: env)
+        @manage_input_mode = input_adapter.nil?
+        @input_adapter = input_adapter || TerminalInput.new(
+          input: input,
+          keyboard_protocol: @capabilities.keyboard_protocol
+        )
         @saved_console_mode = nil
         @application_active = false
       end
 
       def read_event
         @input_adapter.read_event
+      end
+
+      def poll_events
+        return @input_adapter.poll_events if @input_adapter.respond_to?(:poll_events)
+
+        event = @input_adapter.read_event
+        event ? [event] : []
+      end
+
+      def wait_for_input(timeout:)
+        if @input_adapter.respond_to?(:wait_for_input)
+          @input_adapter.wait_for_input(timeout: timeout)
+        elsif timeout && timeout.positive?
+          sleep(timeout)
+        end
       end
 
       def enter_application
@@ -43,7 +68,8 @@ module Sunbird
         write(
           ENTER_ALT_SCREEN +
           CLEAR_SCREEN +
-          HIDE_CURSOR
+          HIDE_CURSOR +
+          keyboard_enable_sequence
         )
       end
 
@@ -52,6 +78,7 @@ module Sunbird
 
         begin
           write(
+            keyboard_disable_sequence +
             SHOW_CURSOR +
             EXIT_ALT_SCREEN
           )
@@ -88,12 +115,24 @@ module Sunbird
 
       private
 
+      def keyboard_enable_sequence
+        return "" unless capabilities.keyboard_protocol == :kitty
+
+        ENABLE_KITTY_KEYBOARD
+      end
+
+      def keyboard_disable_sequence
+        return "" unless capabilities.keyboard_protocol == :kitty
+
+        DISABLE_KITTY_KEYBOARD
+      end
+
       def enter_raw_input
         return unless @manage_input_mode
         return unless console_input?
 
         @saved_console_mode = @input.console_mode
-        @input.raw!(min: 1, time: 0)
+        @input.raw!(min: 0, time: 0)
       end
 
       def restore_input_mode

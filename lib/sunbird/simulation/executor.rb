@@ -13,7 +13,6 @@ module Sunbird
 
       def execute(level:, world:, commands:, bindings:)
         effects = []
-
         commands.each do |command|
           effect = case command
           in Commands::Move
@@ -27,7 +26,6 @@ module Sunbird
           else
             raise ArgumentError, "unsupported command: #{command.inspect}"
           end
-
           effects << effect if effect
         end
 
@@ -45,7 +43,6 @@ module Sunbird
         update_facing(world, command)
         next_x = position.x + command.dx
         next_y = position.y + command.dy
-
         return unless @movement.traversable?(
           level: level,
           world: world,
@@ -65,7 +62,6 @@ module Sunbird
       def update_facing(world, command)
         current = world.component(command.entity_id, :facing)
         return unless current
-
         direction = direction_for(command.dx, command.dy)
         return unless direction
 
@@ -82,7 +78,6 @@ module Sunbird
 
       def execute_attack(world, command, bindings)
         return unless valid_attack?(world, command)
-
         health = world.component(command.target_id, :health)
         if health
           current = [health.current - command.damage, 0].max
@@ -96,7 +91,6 @@ module Sunbird
 
         character_key = bindings.character_for(command.target_id)
         return unless character_key
-
         Effect::DamageCharacter.new(
           character_key: character_key,
           amount: command.damage
@@ -107,6 +101,9 @@ module Sunbird
         return false unless command.damage.positive?
         return false unless world.entity?(command.attacker_id)
         return false unless world.entity?(command.target_id)
+
+        attacker_health = world.component(command.attacker_id, :health)
+        return false if attacker_health&.current&.zero?
 
         attacker = world.component(command.attacker_id, :position)
         target = world.component(command.target_id, :position)
@@ -120,7 +117,6 @@ module Sunbird
 
         health = world.component(command.entity_id, :health)
         return unless health&.current&.zero?
-
         RETIRED_COMPONENTS.each do |name|
           world.remove_component(command.entity_id, name)
         end
