@@ -27,7 +27,7 @@ class RenderSelectorTest < Minitest::Test
     end
 
     assert_equal(
-      "Sunbird v0.3d requires Kitty graphics protocol support",
+      "Sunbird v#{Sunbird::VERSION} requires Kitty graphics protocol support",
       error.message
     )
   end
