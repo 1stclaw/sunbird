@@ -11,6 +11,7 @@ require_relative "sunbird/prototype/catalog"
 require_relative "sunbird/prototype/loader"
 require_relative "sunbird/character"
 require_relative "sunbird/effect"
+require_relative "sunbird/direction"
 
 require_relative "sunbird/world/component_table"
 require_relative "sunbird/world/relations"

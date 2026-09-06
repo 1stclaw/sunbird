@@ -3,12 +3,8 @@
 module Sunbird
   class Simulation
     class Pathfinder
-      DIRECTIONS = [
-        [0, -1].freeze,
-        [1, 0].freeze,
-        [0, 1].freeze,
-        [-1, 0].freeze
-      ].freeze
+      DIRECTIONS = Direction::VECTORS
+
 
       def initialize(movement: Movement.new)
         @movement = movement

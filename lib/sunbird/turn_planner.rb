@@ -2,13 +2,6 @@
 
 module Sunbird
   class TurnPlanner
-    WANDER_DIRECTIONS = [
-      [0, -1].freeze,
-      [1, 0].freeze,
-      [0, 1].freeze,
-      [-1, 0].freeze
-    ].freeze
-
     BEHAVIOR_HANDLERS = {
       idle: :idle_behavior,
       wander: :wander_behavior,
@@ -22,13 +15,13 @@ module Sunbird
     def build(input:, level:, world:, controlled_id:)
       commands = []
 
-      world.entity_ids.each do |entity_id|
-        command = if entity_id == controlled_id
-          controlled_move(input, controlled_id)
-        else
-          behavior_command(level, world, entity_id)
-        end
+      controlled_command = controlled_move(input, controlled_id)
+      commands << controlled_command if controlled_command
 
+      world.entity_ids.each do |entity_id|
+        next if entity_id == controlled_id
+
+        command = behavior_command(level, world, entity_id)
         commands << command if command
       end
 
@@ -56,6 +49,7 @@ module Sunbird
       handler = BEHAVIOR_HANDLERS.fetch(behavior.kind) do
         raise ArgumentError, "unknown behavior: #{behavior.kind.inspect}"
       end
+
       __send__(handler, level, world, entity_id)
     end
 
@@ -64,7 +58,7 @@ module Sunbird
     end
 
     def wander_behavior(_level, _world, entity_id)
-      dx, dy = WANDER_DIRECTIONS.sample
+      dx, dy = Direction::VECTORS.sample
       Simulation::Commands::Move.new(entity_id: entity_id, dx: dx, dy: dy)
     end
 

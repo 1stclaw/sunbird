@@ -28,6 +28,12 @@ module Sunbird
           relation.target_id
         end.freeze
       end
+
+      def remove_entity(entity_id)
+        @relations.delete_if do |relation|
+          relation.source_id == entity_id || relation.target_id == entity_id
+        end
+      end
     end
   end
 end

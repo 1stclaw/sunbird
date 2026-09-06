@@ -4,6 +4,7 @@ module Sunbird
   class World
     def initialize
       @next_entity_id = 0
+      @active_entities = []
       @component_tables = {}
       @relations = Relations.new
     end
@@ -11,6 +12,7 @@ module Sunbird
     def spawn(**components)
       entity_id = @next_entity_id
       @next_entity_id += 1
+      @active_entities[entity_id] = true
 
       components.each do |name, component|
         set_component(entity_id, name, component)
@@ -19,14 +21,29 @@ module Sunbird
       entity_id
     end
 
+    def despawn(entity_id)
+      validate_entity!(entity_id)
+
+      @component_tables.each_value do |table|
+        table.delete(entity_id)
+      end
+      @relations.remove_entity(entity_id)
+      @active_entities[entity_id] = false
+
+      entity_id
+    end
+
     def entity?(entity_id)
       entity_id.is_a?(Integer) &&
         entity_id >= 0 &&
-        entity_id < @next_entity_id
+        entity_id < @next_entity_id &&
+        @active_entities[entity_id] == true
     end
 
     def entity_ids
-      (0...@next_entity_id).to_a.freeze
+      @active_entities.each_index.select do |entity_id|
+        @active_entities[entity_id]
+      end.freeze
     end
 
     def component(entity_id, name)

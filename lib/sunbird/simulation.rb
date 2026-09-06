@@ -32,6 +32,11 @@ module Sunbird
     end
 
     def spawn_character(character_key:, prototype:, entry: level.default_entry)
+      key = character_key.to_sym
+      if @bindings.bound_character?(key)
+        raise ArgumentError, "character already spawned: #{key.inspect}"
+      end
+
       entry_definition = level.entry(entry)
       prototype_definition = @prototypes.fetch(prototype)
 
@@ -57,7 +62,7 @@ module Sunbird
         extra_components: extra
       )
 
-      @bindings.bind(character_key: character_key, entity_id: entity_id)
+      @bindings.bind(character_key: key, entity_id: entity_id)
       @reference_ids[entry_definition.key] = entity_id
       resolve_relations
       entity_id

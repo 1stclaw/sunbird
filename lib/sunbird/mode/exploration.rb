@@ -3,13 +3,6 @@
 module Sunbird
   module Mode
     class Exploration
-      DIRECTIONS = {
-        north: [0, -1].freeze,
-        south: [0, 1].freeze,
-        west: [-1, 0].freeze,
-        east: [1, 0].freeze
-      }.freeze
-
       attr_reader :simulation, :session, :dialogues, :planner
 
       def initialize(simulation:, session:, dialogues:, planner: TurnPlanner.new)
@@ -99,7 +92,7 @@ module Sunbird
         facing = world_view.component(controlled_entity_id, :facing)
         return unless origin && facing
 
-        offset = DIRECTIONS[facing.direction]
+        offset = Direction.delta(facing.direction)
         return unless offset
 
         target_x = origin.x + offset[0]

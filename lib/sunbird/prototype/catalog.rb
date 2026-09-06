@@ -4,8 +4,13 @@ module Sunbird
   class Prototype
     class Catalog
       def initialize(prototypes)
-        @prototypes = prototypes.to_h do |prototype|
-          [prototype.name, prototype]
+        @prototypes = prototypes.each_with_object({}) do |prototype, result|
+          name = prototype.name.to_sym
+          if result.key?(name)
+            raise ArgumentError, "duplicate prototype: #{name.inspect}"
+          end
+
+          result[name] = prototype
         end.freeze
       end
 

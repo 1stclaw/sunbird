@@ -6,6 +6,7 @@ module Sunbird
       Move = Data.define(:entity_id, :dx, :dy)
       Attack = Data.define(:attacker_id, :target_id, :damage)
       Defeat = Data.define(:entity_id)
+      Despawn = Data.define(:entity_id)
 
       class Buffer
         include Enumerable

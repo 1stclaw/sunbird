@@ -22,6 +22,8 @@ module Sunbird
             execute_attack(world, command, bindings)
           in Commands::Defeat
             execute_defeat(world, command)
+          in Commands::Despawn
+            execute_despawn(world, command, bindings)
           else
             raise ArgumentError, "unsupported command: #{command.inspect}"
           end
@@ -75,12 +77,7 @@ module Sunbird
       end
 
       def direction_for(dx, dy)
-        case [dx, dy]
-        when [0, -1] then :north
-        when [0, 1] then :south
-        when [-1, 0] then :west
-        when [1, 0] then :east
-        end
+        Direction.for_delta(dx, dy)
       end
 
       def execute_attack(world, command, bindings)
@@ -129,6 +126,18 @@ module Sunbird
         end
         nil
       end
+      def execute_despawn(world, command, bindings)
+        return unless world.entity?(command.entity_id)
+
+        if bindings.bound_entity?(command.entity_id)
+          raise ArgumentError,
+            "cannot despawn bound character entity: #{command.entity_id.inspect}"
+        end
+
+        world.despawn(command.entity_id)
+        nil
+      end
+
     end
   end
 end
